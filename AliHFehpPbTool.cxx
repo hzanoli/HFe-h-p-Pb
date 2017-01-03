@@ -229,9 +229,9 @@ Bool_t AliHFehpPbTool::CompareMixedEventDistributions()
 Bool_t AliHFehpPbTool::ReadAndProcessCorrelationDistributions(Int_t RebinX , Int_t RebinY )
 {
     
-    TCanvas *CorrelationHist = new TCanvas("CorrelationHist ","CorrelationHist", 1200,900 );
+    //TCanvas *CorrelationHist = new TCanvas("CorrelationHist ","CorrelationHist", 1200,900 );
     
-    CorrelationHist->Divide(4,3);
+   // CorrelationHist->Divide(4,3);
     
     fSameIncEh =  new TH2F *[fpTBins.GetSize()-1];
     fMixedIncEh = new TH2F *[fpTBins.GetSize()-1];
@@ -357,10 +357,10 @@ Bool_t AliHFehpPbTool::ReadAndProcessCorrelationDistributions(Int_t RebinX , Int
         if (fEffCorrectionForElectrons)
             fHFEh[i]->Scale(1./fEffHFe->GetBinContent(i+1));
         
-        CorrelationHist->cd(i+1);
+       // CorrelationHist->cd(i+1);
         
         //fSameIncEh[i]->Draw("lego2");
-        fHFEh[i]->Draw("lego2");
+       // fHFEh[i]->Draw("lego2");
         
     }
     
