@@ -830,13 +830,18 @@ Bool_t AliHFehpPbTool::CalculateHFeEfficiency()
 //
 void AliHFehpPbTool::CalculateFlow1D(AliHFehpPbTool* Reference)
 {
-    TH2F **JetReference = new TH2F *[fpTBinsResults.GetSize()];
-    TH2F **FlowHistograms = new TH2F *[fpTBinsResults.GetSize()];
-    
+    TH1F **JetReference = new TH1F *[fpTBinsResults.GetSize()];
+    fFlowHistograms = new TH1F *[fpTBinsResults.GetSize()];
+    TF1 **FlowFunction = new TF1 *[fpTBinsResults.GetSize()];
     
     for (Int_t i = 0; i < fpTBinsResults.GetSize() ; i++)
     {
-        JetReference[i] = Reference->GetHFeh1D(pT);
+        FlowFunction[i] = new TF1(Form("fit%d",i),"[0] + 2 * [1] * TMath::Cos(x) + 2 * [2] * TMath::Cos(2*x)",-0.5*TMath::Pi(),1.5*TMath::Pi());
+        FlowFunction[i]->SetParameters(10.,0.05, 0.1);
+        JetReference[i] = Reference->GetHFeh1DSub(i);
+        fFlowHistograms[i] = (TH1F*) fHFEhNormalized1D[i]->Clone(Form("FlowHistograms%d",i));
+        fFlowHistograms[i]->Add(JetReference[i],-1);
+        fFlowHistograms[i]->Fit(FlowFunction[i]);
         
     }
     
@@ -928,18 +933,18 @@ Bool_t AliHFehpPbTool::ProjectMCTo1D()
 Bool_t AliHFehpPbTool::ProjectTo1D()
 {
     fHFEhNormalized1D = new TH1F *[fpTBinsResults.GetSize() -1];
+    fHFEhNormSub1D = new TH1F *[fpTBinsResults.GetSize() -1];
     
     for (Int_t i = 0 ; i < fpTBinsResults.GetSize() -1 ; i++ )
     {
         fHFEhNormalized1D[i] = (TH1F*) fHFEhNormalized[i]->ProjectionX(Form("fHFEhNormalized1D%d",i),1, fHFEhNormalized[i]->GetNbinsY());
         fHFEhNormalized1D[i]->Scale(1.,"width");
+        fHFEhNormSub1D[i] = (TH1F*)  fHFEhNormalized1D[i]->Clone(Form("fHFEhNormSub1D%d",i));
         
-        //Subtracting Pedestal and Yeld evaluation using gaussian fit. No flow hypotesis assumed. Test it later!
+        Int_t MinBin[3] = {1,2,3};
+        Double_t MinValue[3] = {fHFEhNormalized1D[i]->GetBinContent(1),fHFEhNormalized1D[i]->GetBinContent(2),fHFEhNormalized1D[i]->GetBinContent(3)};
         
-        Int_t MinBin[3] = {999,999,999};
-        Double_t MinValue[3] = {999,999,999};
-        
-        for (Int_t j = 1; j <=  fHFEhNormalized1D[i]->GetNbinsX() ; j++)
+        for (Int_t j = 4; j <=  fHFEhNormalized1D[i]->GetNbinsX() ; j++)
         {
             if (fHFEhNormalized1D[i]->GetBinContent(j) <= MinValue[0])
             {
@@ -947,10 +952,9 @@ Bool_t AliHFehpPbTool::ProjectTo1D()
                 MinValue[0] =fHFEhNormalized1D[i]->GetBinContent(j);
             }
             
-            
         }
         
-        for (Int_t j = 1; j <=  fHFEhNormalized1D[i]->GetNbinsX() ; j++)
+        for (Int_t j = 4; j <=  fHFEhNormalized1D[i]->GetNbinsX() ; j++)
         {
             if (j == MinBin[0])
                 continue;
@@ -962,7 +966,7 @@ Bool_t AliHFehpPbTool::ProjectTo1D()
             }
         }
         
-        for (Int_t j = 1; j <=  fHFEhNormalized1D[i]->GetNbinsX() ; j++)
+        for (Int_t j = 4; j <=  fHFEhNormalized1D[i]->GetNbinsX() ; j++)
         {
             if (j == MinBin[0] || j == MinBin[1] )
                 continue;
@@ -985,7 +989,7 @@ Bool_t AliHFehpPbTool::ProjectTo1D()
         
         fHFEhNormalized1D[i]->Fit(CorrelationNoFlow, "0");
         
-        fHFEhNormalized1D[i]->Add(PedestalFunction,-1);
+        fHFEhNormSub1D[i]->Add(PedestalFunction,-1);
         
         
         

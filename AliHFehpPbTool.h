@@ -52,7 +52,7 @@ public:
     
     void Process();
     
-    void CalculateFlow(AliHFehpPbTool* Central, AliHFehpPbTool* Peri);
+    void CalculateFlow1D(AliHFehpPbTool* Reference);
     
     Bool_t ReadAndProcessCorrelationDistributions(Int_t RebinX = 2, Int_t RebinY = 2);
     TString TrainConfiguration(
@@ -118,6 +118,8 @@ public:
     TH1F* GetHFeEff() {return fEffHFe;};
     TH1F* GetPurity() {return fHadronContamination;};
     TH1F* GetHFeh1D(Int_t pT ) {return fHFEhNormalized1D[pT];};
+    TH1F* GetHFeh1DSub(Int_t pT) {return fHFEhNormSub1D[pT];};
+    TH1F* GetFlowHistogram(Int_t pT) {return fFlowHistograms[pT];};
     TH2F* GetHFeh2D(Int_t pT ) {return fHFEhNormalized[pT];};
     Double_t GetNEvents();
     
@@ -204,6 +206,9 @@ private:
     //HFe
     TH2F **fHFEh;
     TH2F **fHFEhNormalized;
+    TH1F **fHFEhNormSub1D;
+    TH1F **fFlowHistograms;
+    
     TH2F **fBackNonIDEh;
     TH2F **fHFEhSame;
     TH2F **fHFEhMixed;
