@@ -62,7 +62,7 @@ void Systematics(TString NameMCInput = "MC.root", TString NameDataInput = "DATA.
         HFeEff[Config]->Draw("same");
         
         
-        for (Int_t Centrality = 0 ; Centrality < 1 ; Centrality++)
+        for (Int_t Centrality = 2 ; Centrality >= 0 ; Centrality--)
         {
             Data[Config][Centrality] = new AliHFehpPbTool(Form("Data%d_%d",Config,Centrality), Form("Data%d_%d",Config,Centrality));
             Data[Config][Centrality]->SetUseEffElectrons();
@@ -74,21 +74,11 @@ void Systematics(TString NameMCInput = "MC.root", TString NameDataInput = "DATA.
             Data[Config][Centrality]->SetTagEff(TagEff[Config]);
             Data[Config][Centrality]->SetHFeEff(HFeEff[Config]);
             
-            //Process Data...
             Data[Config][Centrality]->Process();
-            /*
-            Data[Config][Centrality]->ReadpTHistograms();
-            Data[Config][Centrality]->CalculateHadronContamination();
-            Data[Config][Centrality]->ProcesspTHistograms();
-            Data[Config][Centrality]->ReadAndProcessCorrelationDistributions();
-            Data[Config][Centrality]->MergeCorrelationDistributions();
-            Data[Config][Centrality]->NormalizeHFeCorrrelation();
-            Data[Config][Centrality]->ProjectTo1D();
-            */
             
             for (Int_t pT = 0 ; pT < NumerOfpTBins; pT++)
             {
-                HFeh1D[Config][Centrality][pT] = Data[Config][Centrality]->GetHFeh1D(pT);
+                HFeh1D[Config][Centrality][pT] = Data[Config][Centrality]->GetHFeh1DSub(pT);
                 BasicFormat(HFeh1D[Config][Centrality][pT], Color(ConfigurationsArray.At(Config)));
                 Corre1D->cd(pT+1);
                 // HFeh1D[Config][Centrality][pT]->Divide(HFeh1D[Config][Centrality][pT],HFeh1D[0][Centrality][pT],1,1,"B");
@@ -108,10 +98,11 @@ void Systematics(TString NameMCInput = "MC.root", TString NameDataInput = "DATA.
             BasicFormat(ElectronPurity[Config][Centrality], Color(ConfigurationsArray.At(Config)));
             ElectronPurity[Config][Centrality]->Draw("same");
             
-            
-            
 
         }
+        
+        //Calculate flow for central...
+        Data[Config][0]->CalculateFlow1D(Data[Config][0]);
         
     
         
