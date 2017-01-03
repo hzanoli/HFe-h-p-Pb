@@ -16,8 +16,8 @@ void Systematics(TString NameMCInput = "MC.root", TString NameDataInput = "DATA.
     TH1F* HFeEff[20];
     TH1F* pTHFe[20][3];
     TH1F* ElectronPurity[20][3];
-    TH1F* HFeh1D[20][3][8]; //last is pT bin
-    
+    TH1F* HFeh1D[20][3][8]; // Config // Centrality // pT bin
+    TH1F* Flow1D[20][3][8]; //same
     //Centrality Independent corrections
     AliHFehpPbTool* MC[20];
    // Int_t Array[] = {2,3,4,5};
@@ -30,7 +30,10 @@ void Systematics(TString NameMCInput = "MC.root", TString NameDataInput = "DATA.
     TCanvas *HFepT = new TCanvas("HFepT", "HFepT",800,600);
     TCanvas *Purity = new TCanvas("Purity", "Purity", 800,600);
     TCanvas *Corre1D = new TCanvas("Corre1D", "Corre1D", 1200,800);
+    TCanvas *CanvasFlow = new TCanvas("Flow1D", "Flow1D", 1200,800);
+    
     Corre1D->Divide(3,2);
+    CanvasFlow->Divide(3,2);
     
     for (Int_t Config = 0 ; Config < ConfigurationsArray.GetSize() ; Config++ )
     {
@@ -91,7 +94,7 @@ void Systematics(TString NameMCInput = "MC.root", TString NameDataInput = "DATA.
             BasicFormat(pTHFe[Config][Centrality], Color(ConfigurationsArray.At(Config)));
             
             HFepT->cd();
-            pTHFe[Config][Centrality]->Draw("same");
+            //pTHFe[Config][Centrality]->Draw("same");
             
             Purity->cd();
             ElectronPurity[Config][Centrality] = Data[Config][Centrality]->GetPurity();
@@ -100,9 +103,15 @@ void Systematics(TString NameMCInput = "MC.root", TString NameDataInput = "DATA.
             
 
         }
-        
+        for (Int_t pT = 0 ; pT < NumerOfpTBins; pT++)
+        {
         //Calculate flow for central...
-        Data[Config][0]->CalculateFlow1D(Data[Config][0]);
+            Data[Config][0]->CalculateFlow1D(Data[Config][0]);
+            CanvasFlow->cd(pT+1);
+            Flow1D[Config][0][pT] = Data[Config][0]->GetFlowHistogram(pT);
+            Flow1D->Draw("same");
+        }
+        
         
     
         

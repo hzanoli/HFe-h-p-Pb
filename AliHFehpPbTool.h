@@ -49,9 +49,7 @@ public:
     Bool_t CorrelationCT1D();
     Bool_t ReadTaggingEfficiencyFromFile();
     Bool_t CalculateTaggingEfficiencyW();
-    
     void Process();
-    
     void CalculateFlow1D(AliHFehpPbTool* Reference);
     
     Bool_t ReadAndProcessCorrelationDistributions(Int_t RebinX = 2, Int_t RebinY = 2);
