@@ -8,6 +8,7 @@
 #include "TCanvas.h"
 #include "TH2F.h"
 #include "TF1.h"
+#include "TLegend.h"
 #include "TDirectoryFile.h"
 #include "TList.h"
 #include <TROOT.h>
@@ -47,7 +48,15 @@ fHFEMC(0),
 fHFEhMCNormalized(0),
 fHFeMCMixed(0),
 fEffHFe(0),
-fEffCorrectionForElectrons(kFALSE)
+fYieldAS(0),
+fYieldNS(0),
+fEffCorrectionForElectrons(kTRUE),
+fPreMerge(kFALSE),
+fTPCNSigmaCenter(0),
+fTPCNSigmaSTD(0),
+fConfigIndex(0),
+fCentralityIndex(0),
+fLegendTitle(0)
 {
     TH1::AddDirectory(kFALSE);
 }
@@ -86,7 +95,13 @@ fHFEMC(0),
 fHFEhMCNormalized(0),
 fHFeMCMixed(0),
 fEffHFe(0),
-fEffCorrectionForElectrons(kFALSE)
+fYieldAS(0),
+fYieldNS(0),
+fEffCorrectionForElectrons(kTRUE),
+fPreMerge(kFALSE),
+fTPCNSigmaCenter(0),
+fTPCNSigmaSTD(0),
+fLegendTitle(0)
 
 {
     TH1::AddDirectory(kFALSE);
@@ -107,7 +122,7 @@ Bool_t AliHFehpPbTool::ConnectToInputFile(TString FileName, TString Configuratio
     TDirectoryFile *dir = (TDirectoryFile*) fInputFile->Get(DirectoryName);
     
     if (!dir)
-        printf("No Directory to read the list!\n");
+        printf("No Directory to read the list: %s!\n", ConfigurationName.Data());
     
     fInputList = (TList*) dir->Get(ListName);
     
@@ -224,14 +239,20 @@ Bool_t AliHFehpPbTool::CompareMixedEventDistributions()
     
 }
 
-
+void AliHFehpPbTool::PreMerge()
+{
+    Double_t pTBinsCorrelation[] = {0.5,0.75,1.0,1.25,1.5,2,2.5,3,4,6};
+    fpTBins.Set((Int_t) sizeof(pTBinsCorrelation)/sizeof(pTBinsCorrelation[0]),pTBinsCorrelation);
+    fPreMerge = kTRUE;
+}
 
 Bool_t AliHFehpPbTool::ReadAndProcessCorrelationDistributions(Int_t RebinX , Int_t RebinY )
 {
     
     //TCanvas *CorrelationHist = new TCanvas("CorrelationHist ","CorrelationHist", 1200,900 );
     
-   // CorrelationHist->Divide(4,3);
+    // CorrelationHist->Divide(4,3);
+    
     
     fSameIncEh =  new TH2F *[fpTBins.GetSize()-1];
     fMixedIncEh = new TH2F *[fpTBins.GetSize()-1];
@@ -256,22 +277,36 @@ Bool_t AliHFehpPbTool::ReadAndProcessCorrelationDistributions(Int_t RebinX , Int
     fHFEhSame =new TH2F *[fpTBins.GetSize()-1];
     fHFEhMixed =new TH2F *[fpTBins.GetSize()-1];
     
+  
+    
     for (Int_t i = 0; i < fpTBins.GetSize() -1 ; i++)
     {
         //Inclusive Distributions
         fSameIncEh[i] = (TH2F*) fInputList->FindObject(Form("fCEtaPhi_Inc%d",i));
+        fMixedIncEh[i] = (TH2F*) fInputList->FindObject(Form("fCEtaPhi_Inc_EM%d",i));
+        fDiHadron[i] = (TH2F*) fInputList->FindObject(Form("fCEtaPhi_Inc_DiHadron%d",i));
+        
+        
+        if ( (i == (fpTBins.GetSize() - 2))  && (fPreMerge == kTRUE ))
+        {
+            TH2F *TempSameEh = (TH2F*) fInputList->FindObject(Form("fCEtaPhi_Inc%d",i+1));
+            TH2F *TempMixedEh = (TH2F*) fInputList->FindObject(Form("fCEtaPhi_Inc_EM%d",i+1));
+            TH2F *TempDiHadron = (TH2F*) fInputList->FindObject(Form("fCEtaPhi_Inc_DiHadron%d",i+1));
+            fSameIncEh[i]->Add(TempSameEh);
+            fMixedIncEh[i]->Add(TempMixedEh);
+            fDiHadron[i]->Add(TempDiHadron);
+        }
+        
+        
         fSameIncEh[i]->RebinY(RebinY);
         fSameIncEh[i]->RebinX(RebinX);
-        
-        
-        fMixedIncEh[i] = (TH2F*) fInputList->FindObject(Form("fCEtaPhi_Inc_EM%d",i));
         fMixedIncEh[i]->RebinY(RebinY);
         fMixedIncEh[i]->RebinX(RebinX);
         
         //Hadron Contamination
-        fDiHadron[i] = (TH2F*) fInputList->FindObject(Form("fCEtaPhi_Inc_DiHadron%d",i));
         fDiHadron[i]->RebinY(RebinY);
         fDiHadron[i]->RebinX(RebinX);
+        
         TH1F *DihadronpT = (TH1F*)fInputList->FindObject("fPtTrigger_Inc");
         DihadronpT = (TH1F*) DihadronpT->Rebin(fpTBins.GetSize()-1, "DihadronpTRebin", fpTBins.GetArray());
         
@@ -281,43 +316,61 @@ Bool_t AliHFehpPbTool::ReadAndProcessCorrelationDistributions(Int_t RebinX , Int
         
         //Background Same
         fSameBackULSEh[i] = (TH2F*) fInputList->FindObject(Form("fCEtaPhi_ULS_Weight%d",i));
+        fSameBackLSEh[i] = (TH2F*) fInputList->FindObject(Form("fCEtaPhi_LS_Weight%d",i));
+        fSameBackNoPULSEh[i] = (TH2F*) fInputList->FindObject(Form("fCEtaPhi_ULS_NoP_Weight%d",i));
+        fSameBackNoPLSEh[i] = (TH2F*) fInputList->FindObject(Form("fCEtaPhi_LS_NoP_Weight%d",i));
+        fMixedBackULSEh[i] = (TH2F*) fInputList->FindObject(Form("fCEtaPhi_ULS_Weight_EM%d",i));
+        fMixedBackLSEh[i] = (TH2F*) fInputList->FindObject(Form("fCEtaPhi_LS_Weight_EM%d",i));
+        
+        
+        if ( (i == (fpTBins.GetSize() - 2))  && (fPreMerge == kTRUE ))
+        {
+            TH2F* TempfSameBackULSEh = (TH2F*) fInputList->FindObject(Form("fCEtaPhi_ULS_Weight%d",i+1));
+            TH2F* TempfSameBackLSEh = (TH2F*) fInputList->FindObject(Form("fCEtaPhi_LS_Weight%d",i+1));
+            TH2F* TempfSameBackNoPULSEh = (TH2F*) fInputList->FindObject(Form("fCEtaPhi_ULS_NoP_Weight%d",i+1));
+            TH2F* TempfSameBackNoPLSEh = (TH2F*) fInputList->FindObject(Form("fCEtaPhi_LS_NoP_Weight%d",i+1));
+            TH2F* TempfMixedBackULSEh = (TH2F*) fInputList->FindObject(Form("fCEtaPhi_ULS_Weight_EM%d",i+1));
+            TH2F* TempfMixedBackLSEh = (TH2F*) fInputList->FindObject(Form("fCEtaPhi_LS_Weight_EM%d",i+1));
+            
+            fSameBackULSEh[i]->Add(TempfSameBackULSEh);
+            fSameBackLSEh[i]->Add(TempfSameBackLSEh);
+            fSameBackNoPULSEh[i]->Add(TempfSameBackNoPULSEh);
+            fSameBackNoPLSEh[i]->Add(TempfSameBackNoPLSEh);
+            fMixedBackULSEh[i]->Add(TempfMixedBackULSEh);
+            fMixedBackLSEh[i]->Add(TempfMixedBackLSEh);
+            
+        }
+        
+        
+        
         fSameBackULSEh[i]->RebinY(RebinY);
         fSameBackULSEh[i]->RebinX(RebinX);
-        
-        fSameBackLSEh[i] = (TH2F*) fInputList->FindObject(Form("fCEtaPhi_LS_Weight%d",i));
         fSameBackLSEh[i]->RebinY(RebinY);
         fSameBackLSEh[i]->RebinX(RebinX);
-        
-        //ID Back
-        fBackEh[i] = (TH2F*) fSameBackULSEh[i]->Clone(Form("fBackEh%d",i));
-        fBackEh[i]->Add(fSameBackLSEh[i],-1);
-        
-        
-        fSameBackNoPULSEh[i] = (TH2F*) fInputList->FindObject(Form("fCEtaPhi_ULS_NoP_Weight%d",i));
-        fSameBackNoPULSEh[i]->RebinY(RebinY);
-        fSameBackNoPULSEh[i]->RebinX(RebinX);
-        
-        fSameBackNoPLSEh[i] = (TH2F*) fInputList->FindObject(Form("fCEtaPhi_LS_NoP_Weight%d",i));
-        fSameBackNoPLSEh[i]->RebinY(RebinY);
-        fSameBackNoPLSEh[i]->RebinX(RebinX);
-        
-        //NonID Back
-        fBackNonIDEh[i] = (TH2F*) fSameBackNoPULSEh[i]->Clone(Form("fBackNonIDEh%d",i));
-        fBackNonIDEh[i]->Add(fSameBackNoPLSEh[i],-1);
-        fBackNonIDEh[i]->Scale(1./(fEffTagging->GetBinContent(i+1)) - 1.);
-        
-        //Mixed BKG Distribtuions
-        fMixedBackULSEh[i] = (TH2F*) fInputList->FindObject(Form("fCEtaPhi_ULS_Weight_EM%d",i));
         fMixedBackULSEh[i]->RebinY(RebinY);
         fMixedBackULSEh[i]->RebinX(RebinX);
-        
-        fMixedBackLSEh[i] = (TH2F*) fInputList->FindObject(Form("fCEtaPhi_LS_Weight_EM%d",i));
         fMixedBackLSEh[i]->RebinY(RebinY);
         fMixedBackLSEh[i]->RebinX(RebinX);
+        fSameBackNoPULSEh[i]->RebinY(RebinY);
+        fSameBackNoPULSEh[i]->RebinX(RebinX);
+        fSameBackNoPLSEh[i]->RebinY(RebinY);
+        fSameBackNoPLSEh[i]->RebinX(RebinX);
+
         
+        fBackEh[i] = (TH2F*) fSameBackULSEh[i]->Clone(Form("fBackEh%d",i));
+        fBackNonIDEh[i] = (TH2F*) fSameBackNoPULSEh[i]->Clone(Form("fBackNonIDEh%d",i));
         fBackMixedEh[i]  = (TH2F*) fMixedBackULSEh[i]->Clone(Form("fBackMixedEh%d",i));
-        fBackMixedEh[i]->Add(fMixedBackLSEh[i],-1);
         
+        //ID Back
+        
+        fBackEh[i]->Add(fSameBackLSEh[i],-1);
+       
+               
+        //NonID Back
+        
+        fBackNonIDEh[i]->Add(fSameBackNoPLSEh[i],-1);
+        fBackNonIDEh[i]->Scale(1./(fEffTagging->GetBinContent(i+1)) - 1.);
+        fBackMixedEh[i]->Add(fMixedBackLSEh[i],-1);
         fBackMixedEh[i]->Scale(1./(fEffTagging->GetBinContent(i+1)));
         
         //SemiInclusive Distribution
@@ -357,10 +410,10 @@ Bool_t AliHFehpPbTool::ReadAndProcessCorrelationDistributions(Int_t RebinX , Int
         if (fEffCorrectionForElectrons)
             fHFEh[i]->Scale(1./fEffHFe->GetBinContent(i+1));
         
-       // CorrelationHist->cd(i+1);
+        // CorrelationHist->cd(i+1);
         
         //fSameIncEh[i]->Draw("lego2");
-       // fHFEh[i]->Draw("lego2");
+        // fHFEh[i]->Draw("lego2");
         
     }
     
@@ -558,7 +611,7 @@ Bool_t AliHFehpPbTool::CalculateHadronContamination()
 {
     //gStyle->SetOptStat(0);
     
-    Bool_t DrawG = kFALSE;
+    Bool_t DrawG = kTRUE;
     //if (!DrawG) delete HadronContamination;
     //else
     //  HadronContamination->Divide(4,3);
@@ -568,9 +621,26 @@ Bool_t AliHFehpPbTool::CalculateHadronContamination()
     
     fHadronContamination = new TH1F("fHadronContamination","Hadron Contamination", fpTBins.GetSize()-1, fpTBins.GetArray());
     
+    fTPCNSigmaCenter = new TH1F("fTPCNSigmaCenter","Mean TPCNSigma Values for electrons", fpTBins.GetSize()-1, fpTBins.GetArray());
+    fTPCNSigmaSTD = new TH1F("fTPCNSigmaSTD","Mean TPCNSigma Values for electrons", fpTBins.GetSize()-1, fpTBins.GetArray());
+    
     for (Int_t i = 0; i < fpTBins.GetSize() -1; i++)
     {
         TPCTOFNsigma[i] = (TH2F*)fInputList->FindObject(Form("fTOFTPCnsigma_pt%d",i));
+        
+        if ( (i == (fpTBins.GetSize() - 2))  && (fPreMerge == kTRUE ))
+        {
+            TPCTOFNsigma[i]->Add( (TH2F*)fInputList->FindObject(Form("fTOFTPCnsigma_pt%d",i+1)));
+        }
+        TPCTOFNsigma[i]->SetTitle(Form("%1.2f < p_{T}^{e} < %1.2f",fpTBins.At(i), fpTBins.At(i+1)));
+        
+        if  (DrawG)
+        {
+            TCanvas *Plot2DTPCTOF = new TCanvas(Form("Plot2DTPCTOF%d",i),Form("Plot2DTPCTOF%d",i), 900,600 );
+            Plot2DTPCTOF->SetLogz();
+            TPCTOFNsigma[i]->Draw("colz");
+            Plot2DTPCTOF->SaveAs(Form("Plot2DTPCTOF_Cent_%d_pT%d_Config%d.pdf",fCentralityIndex, i,fConfigIndex));
+        }
         if (!TPCTOFNsigma[i])
         {
             printf("Error reading HadronContamination histogram %d\n", i);
@@ -585,22 +655,22 @@ Bool_t AliHFehpPbTool::CalculateHadronContamination()
             TPCNsigma[i]->Rebin(2);
         
         
-        TF1 *pion = new TF1("pion", "exp([0]*x)*landau(1)",-12,8);
+        TF1 *pion = new TF1("Pions", "exp([0]*x)*landau(1)",-12,8);
         
-        pion->SetParameters(-4,TPCNsigma[i]->GetBinContent(TPCNsigma[i]->GetXaxis()->FindBin(-6)), -6, 3);
+        pion->SetParameters(-4,TPCNsigma[i]->GetBinContent(TPCNsigma[i]->GetXaxis()->FindBin(-6)), -6.1, 2.5);
         
         if (fpTBins.At(i) > 3)
             pion->SetParameters(-4,TPCNsigma[i]->GetBinContent(TPCNsigma[i]->GetXaxis()->FindBin(-3)), -3, 2);
         if (fpTBins.At(i) > 4)
             pion->SetParameters(-4,TPCNsigma[i]->GetBinContent(TPCNsigma[i]->GetXaxis()->FindBin(-4)), -3, 2);
         
-        if (fpTBins.At(i) > 4)
-            TPCNsigma[i]->Fit(pion,"RN","", -5, -1);
+        if (fpTBins.At(i) >= 4)
+            TPCNsigma[i]->Fit(pion,"RN","", -4, -2);
         else
             TPCNsigma[i]->Fit(pion,"RN","", -7, -2);
         //TPCNsigma[i]->Fit("landau","IR","", -7, -2);
         
-        TF1 *protonkaon = new TF1("protonkaon", "gaus(0)", -12,8);
+        TF1 *protonkaon = new TF1("Protons and Kaons", "gaus(0)", -12,8);
         
         protonkaon->SetParLimits(1, -10,-4);
         if (fpTBins.At(i) > 1.4)
@@ -614,7 +684,7 @@ Bool_t AliHFehpPbTool::CalculateHadronContamination()
         }
         
         
-        TF1 *elec = new TF1("elec", "gaus", -12, 8);
+        TF1 *elec = new TF1("Electrons", "gaus", -12, 8);
         elec->SetParameters(TPCNsigma[i]->GetBinContent(TPCNsigma[i]->GetXaxis()->FindBin(0.)), 0, 1);
         elec->SetParLimits(1, -1,1);
         
@@ -649,8 +719,6 @@ Bool_t AliHFehpPbTool::CalculateHadronContamination()
             TotalFit->SetParLimits(1, -0.2,0.2);
             TotalFit->SetParLimits(2, 0.8, 1.2);
             
-            
-            
         }
         
         
@@ -675,7 +743,11 @@ Bool_t AliHFehpPbTool::CalculateHadronContamination()
             TCanvas *HadronContamination = new TCanvas(Form("HadronContamination%d",i),Form("HadronContamination%d",i), 900,600 );
             HadronContamination->SetLogy();
             TPCNsigma[i]->Draw();
-            
+            TPCNsigma[i]->SetLineColor(1);
+            TPCNsigma[i]->SetMarkerColor(1);
+            TPCNsigma[i]->SetMarkerSize(1);
+            TPCNsigma[i]->SetMarkerStyle(20);
+
             if (fpTBins.At(i) > 1.4)
             {
                 protonkaon->SetLineColor(kBlue);
@@ -693,8 +765,18 @@ Bool_t AliHFehpPbTool::CalculateHadronContamination()
             elec->Draw("same");
             
             elec->SetLineColor(kGreen);
+            TLegend leg(0.65,0.67,0.88,0.88);
+            leg.AddEntry(TPCNsigma[i],"Data", "lp");
+
+            if (fpTBins.At(i) > 1.4)
+                leg.AddEntry(protonkaon,"Protons/Kaons", "l");
+            leg.SetHeader(fLegendTitle.Data());
+            leg.AddEntry(pion,"Pions", "l");
+            leg.AddEntry(elec,"Electrons", "l");
+            leg.Draw("same");
+            //HadronContamination->BuildLegend();
             
-            HadronContamination->Print(Form("Contamination_%d.pdf",i));
+            HadronContamination->Print(Form("Contamination_Cent_%d_pT%d_Config%d.pdf",fCentralityIndex, i,fConfigIndex));
             
         }
         
@@ -705,6 +787,14 @@ Bool_t AliHFehpPbTool::CalculateHadronContamination()
         Double_t Contamination = (PionIntegral)/(PionIntegral+ElectronIntegral);
         fHadronContamination->SetBinContent(i+1,1-Contamination);
         fHadronContamination->SetBinError(i+1,(1-Contamination)/100000000000000000000.);
+        
+        fTPCNSigmaCenter->SetBinContent(i+1, TotalFit->GetParameter(1));
+        fTPCNSigmaCenter->SetBinError(i+1, TotalFit->GetParError(1));
+        
+        fTPCNSigmaSTD->SetBinContent(i+1, TotalFit->GetParameter(2));
+        fTPCNSigmaSTD->SetBinError(i+1, TotalFit->GetParError(2));
+        
+                                              
         //Double_t BinCounting = TPCNsigma[i]->Integrate(-0.5,3.0);
         printf("Bin: %d, Elec: %1.3f Pion = %1.3f; Total = %1.3f;Cont: = %1.3f \n", i+1, ElectronIntegral, PionIntegral, ElectronIntegral+PionIntegral, Contamination);
         
@@ -776,10 +866,10 @@ Bool_t AliHFehpPbTool::CalculateTaggingEfficiencyW()
     //delete ULS;
     //delete Total;
     
-    TFile *FileCompare = new TFile("CompareYvonne.root","RECREATE");
-    FileCompare->cd();
-    fEffTagging->Write("MyEff");
-
+    //TFile *FileCompare = new TFile("CompareYvonne.root","RECREATE");
+    //FileCompare->cd();
+    //fEffTagging->Write("MyEff");
+    
     
     if (fEffTagging)
         return kTRUE;
@@ -834,14 +924,22 @@ void AliHFehpPbTool::CalculateFlow1D(AliHFehpPbTool* Reference)
     fFlowHistograms = new TH1F *[fpTBinsResults.GetSize()];
     TF1 **FlowFunction = new TF1 *[fpTBinsResults.GetSize()];
     
-    for (Int_t i = 0; i < fpTBinsResults.GetSize() ; i++)
+    for (Int_t i = 0; i < fpTBinsResults.GetSize() - 1 ; i++)
     {
-        FlowFunction[i] = new TF1(Form("fit%d",i),"[0] + 2 * [1] * TMath::Cos(x) + 2 * [2] * TMath::Cos(2*x)",-0.5*TMath::Pi(),1.5*TMath::Pi());
+        printf("Flow 1D 1 %d \n", i);
+        FlowFunction[i] = new TF1(Form("fit%d",i),"[0]*(1 + 2 * [1] * TMath::Cos(x) + 2 * [2] * TMath::Cos(2*x))",-0.5*TMath::Pi(),1.5*TMath::Pi());
         FlowFunction[i]->SetParameters(10.,0.05, 0.1);
+        FlowFunction[i]->FixParameter(1,0);
+        printf("Flow 1D 2 %d \n", i);
+
         JetReference[i] = Reference->GetHFeh1DSub(i);
+        printf("Flow 1D 3 %d \n", i);
+
         fFlowHistograms[i] = (TH1F*) fHFEhNormalized1D[i]->Clone(Form("FlowHistograms%d",i));
         fFlowHistograms[i]->Add(JetReference[i],-1);
-        fFlowHistograms[i]->Fit(FlowFunction[i]);
+        fFlowHistograms[i]->Fit(FlowFunction[i],"0");
+        printf("Flow 1D 4 %d \n", i);
+
         
     }
     
@@ -935,10 +1033,13 @@ Bool_t AliHFehpPbTool::ProjectTo1D()
     fHFEhNormalized1D = new TH1F *[fpTBinsResults.GetSize() -1];
     fHFEhNormSub1D = new TH1F *[fpTBinsResults.GetSize() -1];
     
+    fBaseline = new TH1F("fBaseline", "Baseline", fpTBinsResults.GetSize() -1, fpTBinsResults.GetArray());
+    
     for (Int_t i = 0 ; i < fpTBinsResults.GetSize() -1 ; i++ )
     {
         fHFEhNormalized1D[i] = (TH1F*) fHFEhNormalized[i]->ProjectionX(Form("fHFEhNormalized1D%d",i),1, fHFEhNormalized[i]->GetNbinsY());
         fHFEhNormalized1D[i]->Scale(1.,"width");
+        //fHFEhNormalized1D[i]->Scale(1.0/3.2); //Full eta
         fHFEhNormSub1D[i] = (TH1F*)  fHFEhNormalized1D[i]->Clone(Form("fHFEhNormSub1D%d",i));
         
         Int_t MinBin[3] = {1,2,3};
@@ -984,19 +1085,81 @@ Bool_t AliHFehpPbTool::ProjectTo1D()
         
         //Correlation
         
-        TF1 *CorrelationNoFlow = new TF1("CorrelationNoFlow", "[0] + gaus(1) + gaus(4)", -TMath::Pi()/2.0, (3.0/2.0)*TMath::Pi());
-        CorrelationNoFlow->SetParameters(Pedestal, fHFEhNormalized1D[i]->GetBinContent( fHFEhNormalized1D[i]->GetXaxis()->FindBin(0.)) , 0., 0.5, fHFEhNormalized1D[i]->GetBinContent( fHFEhNormalized1D[i]->GetXaxis()->FindBin(TMath::Pi())), TMath::Pi(), 0.5 );
+        //TF1 *CorrelationNoFlow = new TF1("CorrelationNoFlow", "[0] + gaus(1) + gaus(4)", -TMath::Pi()/2.0, (3.0/2.0)*TMath::Pi());
+        //CorrelationNoFlow->SetParameters(Pedestal, fHFEhNormalized1D[i]->GetBinContent( fHFEhNormalized1D[i]->GetXaxis()->FindBin(0.)) , 0., 0.5, fHFEhNormalized1D[i]->GetBinContent( fHFEhNormalized1D[i]->GetXaxis()->FindBin(TMath::Pi())), TMath::Pi(), 0.5 );
         
-        fHFEhNormalized1D[i]->Fit(CorrelationNoFlow, "0");
+        //fHFEhNormalized1D[i]->Fit(CorrelationNoFlow, "0");
         
         fHFEhNormSub1D[i]->Add(PedestalFunction,-1);
         
-        
+        fBaseline->SetBinContent(i+1,Pedestal);
         
         
     }
     
 }
+
+Bool_t AliHFehpPbTool::SubtractPedestal(Double_t Pedestal)
+{
+    TF1 *PedestalFunction = new TF1("PedestalFunction",Form("%1.4f",Pedestal), -3,7);
+    
+    for (Int_t i = 0 ; i < fpTBinsResults.GetSize() -1 ; i++ )
+    {
+        //Trash the fHFEhNormSub1D[i] previuos values
+        delete fHFEhNormSub1D[i];
+        fHFEhNormSub1D[i] = (TH1F*)  fHFEhNormalized1D[i]->Clone(Form("fHFEhNormSub1D%d",i));
+        fHFEhNormSub1D[i]->Add(PedestalFunction,-1);
+    }
+    
+}
+
+Bool_t AliHFehpPbTool::CalculateYield(Bool_t Flow)
+{
+    TF1 **FitYield = new TF1 *[fpTBinsResults.GetSize() -1];
+    
+    fYieldAS = new TH1F("fYieldAS", "Yields AS",fpTBinsResults.GetSize() -1, fpTBinsResults.GetArray());
+    fYieldNS = new TH1F("fYieldNS", "Yields NS",fpTBinsResults.GetSize() -1, fpTBinsResults.GetArray());
+    
+    for (Int_t pT = 0 ; pT < fpTBinsResults.GetSize() -1 ; pT++)
+    {
+        //gaus = [0]*exp(-0.5*((x-[1])/[2])**2)
+        FitYield[pT] = new TF1 (Form("FitYield%d",pT), "[0]*(1 + 2*[1]*TMath::Cos(2*x)) + gaus(2) + gaus (5)", -0.5*TMath::Pi(),1.5*TMath::Pi());
+        FitYield[pT]->SetParameters(fHFEhNormalized1D[pT]->GetBinContent(fHFEhNormalized1D[pT]->GetNbinsX()/2), 0.005, 3. , 0. , 1., 4.,TMath::Pi(), 1.);
+        if (Flow)
+        {
+            TF1 *FlowFunction = fFlowHistograms[pT]->GetFunction(Form("fit%d",pT));
+            //FitYield[pT]->FixParameter(0, FlowFunction->GetParameter(0));
+            FitYield[pT]->FixParameter(1, FlowFunction->GetParameter(1));
+        }
+        else
+        {
+            //FitYield[pT]->FixParameter(0, Pedestal);
+            FitYield[pT]->FixParameter(1, 0);
+        }
+        
+        FitYield[pT]->FixParameter(3, 0); //Near side peak
+        FitYield[pT]->FixParameter(6, TMath::Pi()); // Away side peak
+        
+        FitYield[pT]->SetParLimits(7, 0.1,3);
+        
+        fHFEhNormalized1D[pT]->Fit(FitYield[pT]);
+        //fHFEhNormSub1D[pT]->Fit(FitYield[pT]);
+        
+        double yieldNS = FitYield[pT]->GetParameter(2)*TMath::Sqrt(TMath::Sqrt(2*TMath::Pi()))*FitYield[pT]->GetParameter(4);
+        double errorNS = yieldNS*TMath::Sqrt( pow((FitYield[pT]->GetParError(4)/FitYield[pT]->GetParameter(4)),2) + pow((FitYield[pT]->GetParError(2)/FitYield[pT]->GetParameter(2)),2));
+        double yieldAS = FitYield[pT]->GetParameter(5)*TMath::Sqrt(TMath::Sqrt(2*TMath::Pi()))*FitYield[pT]->GetParameter(7);
+        double errorAS = yieldAS*TMath::Sqrt( pow((FitYield[pT]->GetParError(5)/FitYield[pT]->GetParameter(5)),2) + pow((FitYield[pT]->GetParError(7)/FitYield[pT]->GetParameter(7)),2));
+        
+        fYieldNS->SetBinContent(pT+1, yieldAS);
+        fYieldNS->SetBinError(pT+1, errorNS);
+        fYieldAS->SetBinContent(pT+1, yieldNS);
+        fYieldAS->SetBinError(pT+1, errorAS);
+        
+    }
+    
+}
+
+
 
 Bool_t AliHFehpPbTool::CorrelationCT1D()
 {
@@ -1009,6 +1172,106 @@ Bool_t AliHFehpPbTool::CorrelationCT1D()
         Ratio1D[i]->Fit("pol0");
     }
 }
+
+Bool_t AliHFehpPbTool::CalculateV22PC()
+{
+    fHFehProjectionForV2NonSub = new TH1F *[fpTBinsResults.GetSize() -1];
+    TF1 **FlowFunction = new TF1 *[fpTBinsResults.GetSize()];
+    
+    for (int pT = 0; pT < fpTBinsResults.GetSize() -1; pT++)
+    {
+        fHFehProjectionForV2NonSub[pT] = (TH1F*)fHFEhNormalized1D[pT]->Clone(Form("fHFehProjectionForV2NonSub%d",pT));
+        fHFehProjectionForV2NonSub[pT]->Reset();
+        //fBackNonIDEh[pT]->Divide(fBackMixedEh[pT]);
+        //fHFEhNormalized[pT] = fBackNonIDEh[pT];
+        //fHFEhNormalized[pT]->Draw("surf1");
+        
+        /*
+         //Near side: only delta eta > 0.8 considered
+         for (Int_t ix = 1 ; ix <= (int)fHFEhNormalized[pT]->GetNbinsX()/2; ix++)
+         {
+         Double_t Mean;
+         Double_t Normalization;
+         
+         // -1.6 < delta eta  < -0.8
+         for (Int_t iy = fHFEhNormalized[pT]->GetYaxis()->FindBin(-1.55) ; iy <= fHFEhNormalized[pT]->GetYaxis()->FindBin(-0.85) ; iy++)
+         {
+         Mean += fHFEhNormalized[pT]->GetBinContent(ix,iy)/( pow(fHFEhNormalized[pT]->GetBinError(ix,iy),2) );
+         Normalization += 1./( pow(fHFEhNormalized[pT]->GetBinError(ix,iy),2) );
+         
+         //Mean += fHFEhNormalized[pT]->GetBinContent(ix,iy);
+         //Normalization += 1;
+         }
+         
+         // 0.8 < delta eta  < 1.6
+         for (Int_t iy = fHFEhNormalized[pT]->GetYaxis()->FindBin(0.85) ; iy <= fHFEhNormalized[pT]->GetYaxis()->FindBin(1.55) ; iy++)
+         {
+         Mean += fHFEhNormalized[pT]->GetBinContent(ix,iy)/( pow(fHFEhNormalized[pT]->GetBinError(ix,iy),2) );
+         Normalization += 1./( pow(fHFEhNormalized[pT]->GetBinError(ix,iy),2) );
+         }
+         
+         fHFehProjectionForV2NonSub[pT]->SetBinContent(ix, Mean/Normalization);
+         fHFehProjectionForV2NonSub[pT]->SetBinError(ix, TMath::Sqrt(1./Normalization));
+         
+         }
+         */
+        
+        //away side: all eta cosidered
+        for (Int_t ix =  1 ; ix <= fHFEhNormalized[pT]->GetNbinsX(); ix++)
+        {
+            Double_t Mean = 0;
+            Double_t Normalization =0;
+            
+            if (ix <= fHFEhNormalized[pT]->GetNbinsX()/2)
+            {
+                
+                for (Int_t iy = fHFEhNormalized[pT]->GetYaxis()->FindBin(-1.55) ; iy <= fHFEhNormalized[pT]->GetYaxis()->FindBin(-0.85) ; iy++)
+                {
+                    Mean += fHFEhNormalized[pT]->GetBinContent(ix,iy)/( pow(fHFEhNormalized[pT]->GetBinError(ix,iy),2) );
+                    Normalization += 1./( pow(fHFEhNormalized[pT]->GetBinError(ix,iy),2) );
+                    //printf("iy = %d normalization = %f mean = %f \n",iy,Normalization,Mean);
+                }
+                
+                for (Int_t iy = fHFEhNormalized[pT]->GetYaxis()->FindBin(0.85) ; iy <= fHFEhNormalized[pT]->GetYaxis()->FindBin(1.55) ; iy++)
+                {
+                    Mean += fHFEhNormalized[pT]->GetBinContent(ix,iy)/( pow(fHFEhNormalized[pT]->GetBinError(ix,iy),2) );
+                    Normalization += 1./( pow(fHFEhNormalized[pT]->GetBinError(ix,iy),2) );
+                    //printf("iy = %d normalization = %f mean = %f \n",iy,Normalization,Mean);
+                }
+                
+                fHFehProjectionForV2NonSub[pT]->SetBinContent(ix, Mean/Normalization);
+                fHFehProjectionForV2NonSub[pT]->SetBinError(ix, TMath::Sqrt(1./Normalization));
+            }
+            else
+            {
+                for (Int_t iy = fHFEhNormalized[pT]->GetYaxis()->FindBin(-1.55) ; iy <= fHFEhNormalized[pT]->GetYaxis()->FindBin(1.55) ; iy++)
+                {
+                    Mean += fHFEhNormalized[pT]->GetBinContent(ix,iy)/( pow(fHFEhNormalized[pT]->GetBinError(ix,iy),2) );
+                    Normalization += 1./( pow(fHFEhNormalized[pT]->GetBinError(ix,iy),2) );
+                    //printf("iy = %d normalization = %f mean = %f \n",iy,Normalization,Mean);
+                }
+                fHFehProjectionForV2NonSub[pT]->SetBinContent(ix, Mean/Normalization);
+                fHFehProjectionForV2NonSub[pT]->SetBinError(ix, TMath::Sqrt(1./Normalization));
+
+
+            }
+
+        
+           
+            
+        }
+        
+        FlowFunction[pT] = new TF1(Form("FitV2NoSub%d",pT),"[0]*(1 + 2 * [1] * TMath::Cos(x) + 2 * [2] * TMath::Cos(2*x))",-0.5*TMath::Pi(),1.5*TMath::Pi());
+        //FlowFunction[pT]->FixParameter(1,0);
+        fHFehProjectionForV2NonSub[pT]->Fit(FlowFunction[pT], "0");
+        
+        //fHFehProjectionForV2NonSub[pT]->Draw();
+        
+    }
+    
+    
+}
+
 
 AliHFehpPbTool::~AliHFehpPbTool() {}
 
