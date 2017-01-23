@@ -21,12 +21,13 @@ public:
     AliHFehpPbTool();
     ~AliHFehpPbTool();
     
+    
     void SetInputFileName(TString Name) {fInputFileName = Name;}
     void SetConfigurationName(TString Name) {fConfigurationName = Name;}
     void SetpTBins(Int_t n, Double_t* array) { fpTBins.Set(n,array); };
     void SetpTBinsResults(Int_t n, Double_t* array) { fpTBinsResults.Set(n,array); };
-    
-    
+    void SetLegendTitle(TString Legend) {fLegendTitle = Legend;};
+
     Bool_t ReadpTHistograms();
     Bool_t ProcesspTHistograms();
     Bool_t MergeCorrelationDistributions();
@@ -49,6 +50,11 @@ public:
     Bool_t CorrelationCT1D();
     Bool_t ReadTaggingEfficiencyFromFile();
     Bool_t CalculateTaggingEfficiencyW();
+    Bool_t SubtractPedestal(Double_t Pedestal);
+    Bool_t CalculateYield(Bool_t Flow =kFALSE);
+    Bool_t CalculateV22PC();
+    
+    
     void Process();
     void CalculateFlow1D(AliHFehpPbTool* Reference);
     
@@ -118,41 +124,22 @@ public:
     TH1F* GetHFeh1D(Int_t pT ) {return fHFEhNormalized1D[pT];};
     TH1F* GetHFeh1DSub(Int_t pT) {return fHFEhNormSub1D[pT];};
     TH1F* GetFlowHistogram(Int_t pT) {return fFlowHistograms[pT];};
+    TH1F* GetYNS() {return fYieldNS;};
+    TH1F* GetYAS() {return fYieldAS;};
+    TH1F* GetBaseline() {return fBaseline;};
+    TH1F* GetFlowHistogramNotSub(Int_t pT) {return fHFehProjectionForV2NonSub[pT];};
+    TH2F* GetHFeh2DSame(Int_t pT ) {return fHFEhNormalized[pT];};
     TH2F* GetHFeh2D(Int_t pT ) {return fHFEhNormalized[pT];};
+    TH1F* GetTPCNSigmaCenter() {return fTPCNSigmaCenter;};
+    TH1F* GetTPCNSigmaSTD() {return fTPCNSigmaSTD;};
     Double_t GetNEvents();
     
     void SetUseEffElectrons(){fEffCorrectionForElectrons = kTRUE;};
-    
+    void PreMerge();
     void SetTagEff(TH1F *eff) {fEffTagging =  (TH1F*) eff->Clone("fEffTagging"); };
     void SetHFeEff(TH1F *HFeEff) {fEffHFe = (TH1F*) HFeEff->Clone("fEffHFe"); };
-    
-    /*
-     TString GetNameFromConfiguration(Bool_t Correlation = kTRUE,
-     Bool_t ispp = kFALSE,
-     Bool_t isMC = kTRUE,
-     Bool_t FinepTBinning = kFALSE,
-     Double_t ElectronDCAxy = 0.25,
-     Double_t ElectronDCAz = 1.0,
-     Double_t HadronDCAxy = 0.25,
-     Double_t HadronDCAz = 1.0,
-     Double_t TPCPIDLow = -0.5,
-     Double_t TPCPIDUp = 3.0,
-     Double_t InvariantMassCut = 0.14,
-     Double_t pTCutPartner = 0.0,
-     Double_t MultiplicityLow = 0.,
-     Double_t MultiplicityUp = 100.,
-     Double_t HadronPtCutLow = 0.3,
-     Double_t HadronPtCutUp = 2.0,
-     Double_t EtaCutLow = -0.8,
-     Double_t EtaCutUp = 0.8,
-     Double_t NonHFEangleCut = 999,
-     Int_t NHitsITS = 4,
-     Int_t SPDLayers = 0,
-     Int_t TPCNCluster = 100,
-     Int_t TPCNClusterPartner = 60,
-     Int_t TPCNClusterPID = 80);
-     */
-    
+    void SetConfigNumber(Int_t Number) {fConfigIndex = Number;};
+    void SetCentralityIndex(Int_t Centrality) {fCentralityIndex = Centrality;};
     
     
 private:
@@ -162,6 +149,11 @@ private:
     
     Bool_t fPrintHistograms;
     Bool_t fEffCorrectionForElectrons;
+    Bool_t fPreMerge;
+    
+    Int_t fConfigIndex;
+    Int_t fCentralityIndex;
+    TString fLegendTitle;
     
     TFile *fInputFile; //!
     TList *fInputList; //!
@@ -180,6 +172,8 @@ private:
     //Corrections
     TH1F* fEffTagging;
     TH1F* fHadronContamination;
+    TH1F* fTPCNSigmaCenter;
+    TH1F* fTPCNSigmaSTD;
     TH1F* fEffHFe;
     
     Double_t fTOFNSigma;
@@ -206,6 +200,7 @@ private:
     TH2F **fHFEhNormalized;
     TH1F **fHFEhNormSub1D;
     TH1F **fFlowHistograms;
+    TH1F **fHFehProjectionForV2NonSub;
     
     TH2F **fBackNonIDEh;
     TH2F **fHFEhSame;
@@ -220,6 +215,9 @@ private:
     TH1F **fHFEhNormalized1D;
     
     
+    TH1F *fYieldAS;
+    TH1F *fYieldNS;
+    TH1F *fBaseline;
     
     
     ClassDef(AliHFehpPbTool, 1);
