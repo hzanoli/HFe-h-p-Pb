@@ -296,6 +296,8 @@ Bool_t AliHFehpPbTool::ReadAndProcessCorrelationDistributions(Int_t RebinX , Int
             fMixedIncEh[i]->Add(TempMixedEh);
             fDiHadron[i]->Add(TempDiHadron);
         }
+        fSameIncEh[i]->SetTitle(Form("%1.2f < p^{e}_{T} < %1.2f GeV/c", fpTBins.At(i), fpTBins.At(i+1)));
+        fMixedIncEh[i]->SetTitle(Form("%1.2f < p^{e}_{T} < %1.2f GeV/c", fpTBins.At(i), fpTBins.At(i+1)));
         
         
         fSameIncEh[i]->RebinY(RebinY);
@@ -714,7 +716,7 @@ Bool_t AliHFehpPbTool::CalculateHadronContamination()
         }
         else
         {
-            TotalFit = new TF1("Total", "gaus(0) + exp([3]*x)*landau(4)",-12,8); //Elec + proton/Kaon + pion
+            TotalFit = new TF1("Total", "gaus(0) + exp([3]*x)*landau(4)",-10,3.5); //Elec + proton/Kaon + pion
             TotalFit->SetParameters(TPCNsigma[i]->GetBinContent(TPCNsigma[i]->GetXaxis()->FindBin(0.)), 0, 1, pion->GetParameter(0), pion->GetParameter(1), pion->GetParameter(2), pion->GetParameter(3) );
             TotalFit->SetParLimits(1, -0.2,0.2);
             TotalFit->SetParLimits(2, 0.8, 1.2);
@@ -773,6 +775,7 @@ Bool_t AliHFehpPbTool::CalculateHadronContamination()
             leg.SetHeader(fLegendTitle.Data());
             leg.AddEntry(pion,"Pions", "l");
             leg.AddEntry(elec,"Electrons", "l");
+            //leg.AddEntry((TObject*)0,Form("#chi^2/NDF = %1.2f", TotalFit->GetChisquare()), "l");
             leg.Draw("same");
             //HadronContamination->BuildLegend();
             
@@ -841,6 +844,55 @@ Bool_t AliHFehpPbTool::CalculateTaggingEfficiency()
     
     return kTRUE;
     
+}
+
+void AliHFehpPbTool::Print2DCorrelation()
+{
+    for (int i = 0; i < fpTBins.GetSize() - 1 ; i++)
+    {
+        TCanvas print2Dplot("localprint","localprint",1200,300);
+        print2Dplot.Divide(3,1);
+        print2Dplot.cd(1);
+        FormatTH2Titles(fHFEhSame[i]);
+        fHFEhSame[i]->GetZaxis()->SetTitle("N_{eh}^{same}");
+        fHFEhSame[i]->GetXaxis()->SetTitle("#Delta#varphi(rad)");
+
+        fHFEhSame[i]->Draw("surf1");
+        print2Dplot.cd(2);
+        FormatTH2Titles(fHFEhMixed[i]);
+        fHFEhMixed[i]->Draw("surf1");
+        fHFEhMixed[i]->GetZaxis()->SetTitle("N_{eh}^{mixed}/N(0,0)");
+        fHFEhMixed[i]->GetXaxis()->SetTitle("#Delta#varphi(rad)");
+        print2Dplot.cd(3);
+        FormatTH2Titles(fHFEh[i]);
+        fHFEh[i]->Draw("surf1");
+        fHFEh[i]->GetZaxis()->SetTitle("N_{eh}/#varepsilon_{tracking}");
+        fHFEh[i]->GetXaxis()->SetTitle("#Delta#varphi(rad)");
+        
+        print2Dplot.Print(Form("HfeEffCorrected_%d_%d_%d.pdf",fConfigIndex,fCentralityIndex,i));
+    }
+    
+    for (int i = 0; i < fpTBinsResults.GetSize() - 1 ; i++)
+    {
+        TCanvas merged("merged","merged",400,300);
+        merged.cd();
+        FormatTH2Titles(fHFEhNormalized[i]);
+        fHFEhNormalized[i]->Draw("surf1");
+        fHFEhNormalized[i]->GetZaxis()->SetTitle("N_{eh}/N_{e}");
+        merged.Print(Form("Hfe_merged_%d_%d_%d.pdf",fConfigIndex,fCentralityIndex,i));
+    }
+
+       //fHFEhNormalized[pT]; //
+}
+
+void AliHFehpPbTool::FormatTH2Titles(TH2F* histo)
+{
+    histo->GetYaxis()->SetRangeUser(-1.6,1.6);
+    histo->GetXaxis()->SetTitleSize(0.06);
+    histo->GetXaxis()->SetTitleOffset(1.3);
+    histo->GetYaxis()->SetTitleSize(0.06);
+    histo->GetYaxis()->SetTitleOffset(1.3);
+    histo->GetZaxis()->SetTitleSize(0.05);
 }
 
 Bool_t AliHFehpPbTool::CalculateTaggingEfficiencyW()
