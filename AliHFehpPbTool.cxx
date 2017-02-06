@@ -385,10 +385,11 @@ Bool_t AliHFehpPbTool::ReadAndProcessCorrelationDistributions(Int_t RebinX , Int
         {
             for (Int_t iy = 1; iy <= fHFEhSame[i]->GetNbinsY(); iy++ )
             {
-                fHFEhSame[i]->SetBinError(ix,iy,  TMath::Sqrt(fHFEhSame[i]->GetBinContent(ix,iy)) );
+                fHFEhSame[i]->SetBinError(ix,iy,  TMath::Sqrt( TMath::Abs(pow(fSameIncEh[i]->GetBinError(ix,iy),2) -  pow(fBackEh[i]->GetBinError(ix,iy),2) )) );
             }
         }
         
+         
         
         //HFe Same Distibution
         fHFEhSame[i]->Add(fBackNonIDEh[i],-1);
@@ -613,7 +614,7 @@ Bool_t AliHFehpPbTool::CalculateHadronContamination()
 {
     //gStyle->SetOptStat(0);
     
-    Bool_t DrawG = kTRUE;
+    Bool_t DrawG = kFALSE;
     //if (!DrawG) delete HadronContamination;
     //else
     //  HadronContamination->Divide(4,3);
