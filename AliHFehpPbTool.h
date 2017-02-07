@@ -57,6 +57,7 @@ public:
     
     void Process();
     void CalculateFlow1D(AliHFehpPbTool* Reference);
+    void FormatTH2Titles(TH2F* histo);
     
     Bool_t ReadAndProcessCorrelationDistributions(Int_t RebinX = 2, Int_t RebinY = 2);
     TString TrainConfiguration(
@@ -128,8 +129,10 @@ public:
     TH1F* GetYAS() {return fYieldAS;};
     TH1F* GetBaseline() {return fBaseline;};
     TH1F* GetFlowHistogramNotSub(Int_t pT) {return fHFehProjectionForV2NonSub[pT];};
-    TH2F* GetHFeh2DSame(Int_t pT ) {return fHFEhNormalized[pT];};
-    TH2F* GetHFeh2D(Int_t pT ) {return fHFEhNormalized[pT];};
+    TH2F* GetHFeh2DSame(Int_t pT ) {return fHFEhSame[pT];};
+    TH2F* GetHFeh2DMixed(Int_t pT ) {return fHFEhMixed[pT];};
+    TH2F* GetHFeh2D(Int_t pT ) {return fHFEh[pT];};
+    TH2F* GetHFehMergedAndNormalized(Int_t pT) {return fHFEhNormalized[pT];};
     TH1F* GetTPCNSigmaCenter() {return fTPCNSigmaCenter;};
     TH1F* GetTPCNSigmaSTD() {return fTPCNSigmaSTD;};
     Double_t GetNEvents();
@@ -140,6 +143,8 @@ public:
     void SetHFeEff(TH1F *HFeEff) {fEffHFe = (TH1F*) HFeEff->Clone("fEffHFe"); };
     void SetConfigNumber(Int_t Number) {fConfigIndex = Number;};
     void SetCentralityIndex(Int_t Centrality) {fCentralityIndex = Centrality;};
+    void Print2DCorrelation();
+
     
     
 private:
