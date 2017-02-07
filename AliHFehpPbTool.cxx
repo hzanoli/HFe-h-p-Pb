@@ -1175,37 +1175,47 @@ Bool_t AliHFehpPbTool::CalculateYield(Bool_t Flow)
     
     for (Int_t pT = 0 ; pT < fpTBinsResults.GetSize() -1 ; pT++)
     {
-        //gaus = [0]*exp(-0.5*((x-[1])/[2])**2)
-        FitYield[pT] = new TF1 (Form("FitYield%d",pT), "[0]*(1 + 2*[1]*TMath::Cos(2*x)) + gaus(2) + gaus (5)", -0.5*TMath::Pi(),1.5*TMath::Pi());
-        FitYield[pT]->SetParameters(fHFEhNormalized1D[pT]->GetBinContent(fHFEhNormalized1D[pT]->GetNbinsX()/2), 0.005, 3. , 0. , 1., 4.,TMath::Pi(), 1.);
-        if (Flow)
-        {
-            TF1 *FlowFunction = fFlowHistograms[pT]->GetFunction(Form("fit%d",pT));
+        //TCanvas *Yield = new TCanvas(Form(Form(""),));
+        //NS gaussian -> [0] = area, [1] = mean , [2] = sigma
+        //AS gaussian -> [3] = area, [4] = mean , [5] = sigma
+        //[6] = pedestal
+        //FitYield[pT] = new TF1 (Form("FitYield%d",pT), "[0]*(1 + 2*[1]*TMath::Cos(2*x)) + gaus(2) + gaus (5)", -0.5*TMath::Pi(),1.5*TMath::Pi());
+        FitYield[pT] = new TF1 (Form("FitYield%d",pT), "[0]/TMath::Sqrt(2.*TMath::Pi())/[2]*TMath::Exp(-(x-[1])*(x-[1])/2./([2]*[2])) + [3]/TMath::Sqrt(2.*TMath::Pi())/[5]*TMath::Exp(-(x-[4])*(x-[4])/2./([5]*[5])) +[6] ",-0.5*TMath::Pi(),1.5*TMath::Pi());
+        
+        FitYield[pT]->SetParameters(1., 0 , 0.7 , 1., TMath::Pi(), 0.7, fHFEhNormalized1D[pT]->GetBinContent(fHFEhNormalized1D[pT]->GetNbinsX()/2));
+       // if (Flow)
+        //{
+          //  TF1 *FlowFunction = fFlowHistograms[pT]->GetFunction(Form("fit%d",pT));
             //FitYield[pT]->FixParameter(0, FlowFunction->GetParameter(0));
-            FitYield[pT]->FixParameter(1, FlowFunction->GetParameter(1));
-        }
-        else
-        {
+           // FitYield[pT]->FixParameter(1, FlowFunction->GetParameter(1));
+        //}
+        //else
+        //{
             //FitYield[pT]->FixParameter(0, Pedestal);
-            FitYield[pT]->FixParameter(1, 0);
-        }
+            //FitYield[pT]->FixParameter(1, 0);
+       // }
         
-        FitYield[pT]->FixParameter(3, 0); //Near side peak
-        FitYield[pT]->FixParameter(6, TMath::Pi()); // Away side peak
+        FitYield[pT]->FixParameter(1, 0); //Near side peak
+        FitYield[pT]->FixParameter(4, TMath::Pi()); // Away side peak
         
-        FitYield[pT]->SetParLimits(7, 0.1,3);
+        FitYield[pT]->SetParLimits(5, 0.1,3);
+        FitYield[pT]->SetParLimits(2, 0.1,3);
+
         
         fHFEhNormalized1D[pT]->Fit(FitYield[pT]);
         //fHFEhNormSub1D[pT]->Fit(FitYield[pT]);
         
-        double yieldNS = FitYield[pT]->GetParameter(2)*TMath::Sqrt(TMath::Sqrt(2*TMath::Pi()))*FitYield[pT]->GetParameter(4);
-        double errorNS = yieldNS*TMath::Sqrt( pow((FitYield[pT]->GetParError(4)/FitYield[pT]->GetParameter(4)),2) + pow((FitYield[pT]->GetParError(2)/FitYield[pT]->GetParameter(2)),2));
-        double yieldAS = FitYield[pT]->GetParameter(5)*TMath::Sqrt(TMath::Sqrt(2*TMath::Pi()))*FitYield[pT]->GetParameter(7);
-        double errorAS = yieldAS*TMath::Sqrt( pow((FitYield[pT]->GetParError(5)/FitYield[pT]->GetParameter(5)),2) + pow((FitYield[pT]->GetParError(7)/FitYield[pT]->GetParameter(7)),2));
+        double yieldNS = FitYield[pT]->GetParameter(0);
+        double errorNS = FitYield[pT]->GetParError(0);
+
+        double yieldAS =  FitYield[pT]->GetParameter(3);
+        double errorAS =FitYield[pT]->GetParError(3);
         
-        fYieldNS->SetBinContent(pT+1, yieldAS);
+        printf("Yield NS: %1.4f +-%1.4f, AN: %1.4f+-%1.4f \n", yieldNS,errorNS,yieldAS, errorAS);
+        fYieldNS->SetBinContent(pT+1, yieldNS);
         fYieldNS->SetBinError(pT+1, errorNS);
-        fYieldAS->SetBinContent(pT+1, yieldNS);
+        
+        fYieldAS->SetBinContent(pT+1, yieldAS);
         fYieldAS->SetBinError(pT+1, errorAS);
         
     }
