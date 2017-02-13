@@ -58,7 +58,7 @@ fConfigIndex(0),
 fCentralityIndex(0),
 fLegendTitle(0)
 {
-    TH1::AddDirectory(kFALSE);
+   // TH1::AddDirectory(kFALSE);
 }
 
 
@@ -104,7 +104,7 @@ fTPCNSigmaSTD(0),
 fLegendTitle(0)
 
 {
-    TH1::AddDirectory(kFALSE);
+    //TH1::AddDirectory(kFALSE);
 }
 
 Bool_t AliHFehpPbTool::ConnectToInputFile(TString FileName, TString ConfigurationName)
@@ -550,12 +550,22 @@ Bool_t AliHFehpPbTool::CorrectMCDistributionsByMixing()
 
 Bool_t AliHFehpPbTool::CorrelationCT()
 {
-    TH2F **Ratio = new TH2F *[fpTBinsResults.GetSize() -1];
+    fRatio2DMCCT = new TH2F *[fpTBinsResults.GetSize() -1];
+    TCanvas **Canvas = new TCanvas *[fpTBinsResults.GetSize() -1];
     
     for (Int_t i = 0 ; i < fpTBinsResults.GetSize() -1 ; i++ )
     {
-        Ratio[i] = (TH2F*) fHFEhNormalized[i]->Clone(Form("RatioDataMC%d",i));
-        Ratio[i]->Divide( Ratio[i], fHFEhMCNormalized[i]);
+        Canvas[i] = new TCanvas(Form("MCCT%d",i),Form("MCCT%d",i),400,300);
+        Canvas[i]->cd();
+        fRatio2DMCCT[i] = (TH2F*) fHFEhNormalized[i]->Clone(Form("RatioDataMC%d",i));
+        fRatio2DMCCT[i]->Divide(fRatio2DMCCT[i], fHFEhMCNormalized[i]);
+        fRatio2DMCCT[i]->GetZaxis()->SetTitle("Rec/MC");
+        fRatio2DMCCT[i]->GetYaxis()->SetRangeUser(-1.6,1.6);
+        fRatio2DMCCT[i]->GetYaxis()->SetTitleOffset(1.8);
+        fRatio2DMCCT[i]->GetXaxis()->SetTitleOffset(1.6);
+        fRatio2DMCCT[i]->GetZaxis()->SetTitleOffset(1.4);
+        fRatio2DMCCT[i]->Draw("surf1");
+        Canvas[i]->SaveAs(Form("MC_test_%d.pdf",i));
     }
 }
 
@@ -789,8 +799,14 @@ Bool_t AliHFehpPbTool::CalculateHadronContamination()
         //Double_t ProtonkaonIntegral= protonkaon->Integral(-0.5,3.0);
         
         Double_t Contamination = (PionIntegral)/(PionIntegral+ElectronIntegral);
-        fHadronContamination->SetBinContent(i+1,1-Contamination);
-        fHadronContamination->SetBinError(i+1,(1-Contamination)/100000000000000000000.);
+        
+        //REMOVE THIS FOR PRODUCTION
+        //fHadronContamination->SetBinContent(i+1,1-Contamination);
+        //fHadronContamination->SetBinError(i+1,(1-Contamination)/100000000000000000000.);
+        
+        fHadronContamination->SetBinContent(i+1,1);
+        fHadronContamination->SetBinError(i+1,(1)/100000000000000000000.);
+
         
         fTPCNSigmaCenter->SetBinContent(i+1, TotalFit->GetParameter(1));
         fTPCNSigmaCenter->SetBinError(i+1, TotalFit->GetParError(1));
@@ -971,7 +987,7 @@ Bool_t AliHFehpPbTool::CalculateHFeEfficiency()
 }
 
 //
-void AliHFehpPbTool::CalculateFlow1D(AliHFehpPbTool* Reference)
+void AliHFehpPbTool::CalculateFlow1D(AliHFehpPbTool* Reference, Bool_t FitConstant)
 {
     TH1F **JetReference = new TH1F *[fpTBinsResults.GetSize()];
     fFlowHistograms = new TH1F *[fpTBinsResults.GetSize()];
@@ -979,19 +995,20 @@ void AliHFehpPbTool::CalculateFlow1D(AliHFehpPbTool* Reference)
     
     for (Int_t i = 0; i < fpTBinsResults.GetSize() - 1 ; i++)
     {
-        printf("Flow 1D 1 %d \n", i);
-        FlowFunction[i] = new TF1(Form("fit%d",i),"[0]*(1 + 2 * [1] * TMath::Cos(x) + 2 * [2] * TMath::Cos(2*x))",-0.5*TMath::Pi(),1.5*TMath::Pi());
-        FlowFunction[i]->SetParameters(10.,0.05, 0.1);
-        FlowFunction[i]->FixParameter(1,0);
-        printf("Flow 1D 2 %d \n", i);
+        if (FitConstant)
+            FlowFunction[i] = new TF1(Form("fit%d",i),"[0]",-0.5*TMath::Pi(),1.5*TMath::Pi());
+        else
+        {
+            FlowFunction[i] = new TF1(Form("fit%d",i),"[0]*(1 + 2 * [1] * TMath::Cos(x) + 2 * [2] * TMath::Cos(2*x))",-0.5*TMath::Pi(),1.5*TMath::Pi());
+            FlowFunction[i]->SetParameters(10.,0.05, 0.1);
+            FlowFunction[i]->FixParameter(1,0);
+        }
 
         JetReference[i] = Reference->GetHFeh1DSub(i);
-        printf("Flow 1D 3 %d \n", i);
 
         fFlowHistograms[i] = (TH1F*) fHFEhNormalized1D[i]->Clone(Form("FlowHistograms%d",i));
         fFlowHistograms[i]->Add(JetReference[i],-1);
         fFlowHistograms[i]->Fit(FlowFunction[i],"0");
-        printf("Flow 1D 4 %d \n", i);
 
         
     }
@@ -1152,17 +1169,12 @@ Bool_t AliHFehpPbTool::ProjectTo1D()
     
 }
 
-Bool_t AliHFehpPbTool::SubtractPedestal(Double_t Pedestal)
+Bool_t AliHFehpPbTool::SubtractPedestal(Double_t Pedestal, Int_t pT)
 {
     TF1 *PedestalFunction = new TF1("PedestalFunction",Form("%1.4f",Pedestal), -3,7);
-    
-    for (Int_t i = 0 ; i < fpTBinsResults.GetSize() -1 ; i++ )
-    {
-        //Trash the fHFEhNormSub1D[i] previuos values
-        delete fHFEhNormSub1D[i];
-        fHFEhNormSub1D[i] = (TH1F*)  fHFEhNormalized1D[i]->Clone(Form("fHFEhNormSub1D%d",i));
-        fHFEhNormSub1D[i]->Add(PedestalFunction,-1);
-    }
+    delete fHFEhNormSub1D[pT];
+    fHFEhNormSub1D[pT] = (TH1F*)  fHFEhNormalized1D[pT]->Clone(Form("fHFEhNormSub1D%d",pT));
+    fHFEhNormSub1D[pT]->Add(PedestalFunction,-1);
     
 }
 
@@ -1182,7 +1194,7 @@ Bool_t AliHFehpPbTool::CalculateYield(Bool_t Flow)
         //FitYield[pT] = new TF1 (Form("FitYield%d",pT), "[0]*(1 + 2*[1]*TMath::Cos(2*x)) + gaus(2) + gaus (5)", -0.5*TMath::Pi(),1.5*TMath::Pi());
         FitYield[pT] = new TF1 (Form("FitYield%d",pT), "[0]/TMath::Sqrt(2.*TMath::Pi())/[2]*TMath::Exp(-(x-[1])*(x-[1])/2./([2]*[2])) + [3]/TMath::Sqrt(2.*TMath::Pi())/[5]*TMath::Exp(-(x-[4])*(x-[4])/2./([5]*[5])) +[6] ",-0.5*TMath::Pi(),1.5*TMath::Pi());
         
-        FitYield[pT]->SetParameters(1., 0 , 0.7 , 1., TMath::Pi(), 0.7, fHFEhNormalized1D[pT]->GetBinContent(fHFEhNormalized1D[pT]->GetNbinsX()/2));
+        FitYield[pT]->SetParameters(2., 0. , 0.7 , 1., TMath::Pi(), 0.7, fHFEhNormalized1D[pT]->GetBinContent(fHFEhNormalized1D[pT]->GetNbinsX()/2));
        // if (Flow)
         //{
           //  TF1 *FlowFunction = fFlowHistograms[pT]->GetFunction(Form("fit%d",pT));
@@ -1197,13 +1209,14 @@ Bool_t AliHFehpPbTool::CalculateYield(Bool_t Flow)
         
         FitYield[pT]->FixParameter(1, 0); //Near side peak
         FitYield[pT]->FixParameter(4, TMath::Pi()); // Away side peak
+        //FitYield[pT]->FixParameter(6, 0);
         
-        FitYield[pT]->SetParLimits(5, 0.1,3);
-        FitYield[pT]->SetParLimits(2, 0.1,3);
+        FitYield[pT]->SetParLimits(5, 0.5,3);
+        FitYield[pT]->SetParLimits(2, 0.3,3);
 
         
-        fHFEhNormalized1D[pT]->Fit(FitYield[pT]);
         //fHFEhNormSub1D[pT]->Fit(FitYield[pT]);
+        fHFEhNormalized1D[pT]->Fit(FitYield[pT], "0+");
         
         double yieldNS = FitYield[pT]->GetParameter(0);
         double errorNS = FitYield[pT]->GetParError(0);
@@ -1218,7 +1231,11 @@ Bool_t AliHFehpPbTool::CalculateYield(Bool_t Flow)
         fYieldAS->SetBinContent(pT+1, yieldAS);
         fYieldAS->SetBinError(pT+1, errorAS);
         
+        SubtractPedestal(FitYield[pT]->GetParameter(6),pT);
+        
     }
+    
+    
     
 }
 
@@ -1226,13 +1243,19 @@ Bool_t AliHFehpPbTool::CalculateYield(Bool_t Flow)
 
 Bool_t AliHFehpPbTool::CorrelationCT1D()
 {
+    TCanvas **Canvas = new TCanvas *[fpTBinsResults.GetSize() -1];
     TH1F **Ratio1D = new TH1F *[fpTBinsResults.GetSize() -1];
+    
     gStyle->SetOptFit(1);
     for (Int_t i = 0 ; i < fpTBinsResults.GetSize() -1 ; i++ )
     {
+        Canvas[i] = new TCanvas(Form("CorrelationCT1D%d",i),Form("CorrelationCT1D%d",i),400,300);
+        Canvas[i]->cd();
         Ratio1D[i] = (TH1F*) fHFEhNormalized1D[i]->Clone(Form("RatioDataMC1D%d",i));
         Ratio1D[i]->Divide( Ratio1D[i], fHFEhMCNormalized1D[i]);
         Ratio1D[i]->Fit("pol0");
+        Canvas[i]->SaveAs(Form("CorrelationCT1D%d",i));
+        
     }
 }
 

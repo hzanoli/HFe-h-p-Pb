@@ -50,13 +50,13 @@ public:
     Bool_t CorrelationCT1D();
     Bool_t ReadTaggingEfficiencyFromFile();
     Bool_t CalculateTaggingEfficiencyW();
-    Bool_t SubtractPedestal(Double_t Pedestal);
+    Bool_t SubtractPedestal(Double_t Pedestal,Int_t pT);
     Bool_t CalculateYield(Bool_t Flow =kFALSE);
     Bool_t CalculateV22PC();
     
     
     void Process();
-    void CalculateFlow1D(AliHFehpPbTool* Reference);
+    void CalculateFlow1D(AliHFehpPbTool* Reference,Bool_t FitConstant  = kFALSE);
     void FormatTH2Titles(TH2F* histo);
     
     Bool_t ReadAndProcessCorrelationDistributions(Int_t RebinX = 2, Int_t RebinY = 2);
@@ -135,6 +135,7 @@ public:
     TH2F* GetHFehMergedAndNormalized(Int_t pT) {return fHFEhNormalized[pT];};
     TH1F* GetTPCNSigmaCenter() {return fTPCNSigmaCenter;};
     TH1F* GetTPCNSigmaSTD() {return fTPCNSigmaSTD;};
+    TH2F* GetMC2DCT(Int_t pT){return fRatio2DMCCT[pT];};
     Double_t GetNEvents();
     
     void SetUseEffElectrons(){fEffCorrectionForElectrons = kTRUE;};
@@ -223,6 +224,7 @@ private:
     TH1F *fYieldAS;
     TH1F *fYieldNS;
     TH1F *fBaseline;
+    TH2F **fRatio2DMCCT;
     
     
     ClassDef(AliHFehpPbTool, 1);
