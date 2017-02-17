@@ -555,6 +555,8 @@ Bool_t AliHFehpPbTool::CorrelationCT()
     
     for (Int_t i = 0 ; i < fpTBinsResults.GetSize() -1 ; i++ )
     {
+        //fHFEhNormalized[i]->RebinY(2);
+        //fHFEhMCNormalized[i]->RebinY(2);
         Canvas[i] = new TCanvas(Form("MCCT%d",i),Form("MCCT%d",i),400,300);
         Canvas[i]->cd();
         fRatio2DMCCT[i] = (TH2F*) fHFEhNormalized[i]->Clone(Form("RatioDataMC%d",i));
@@ -624,7 +626,7 @@ Bool_t AliHFehpPbTool::CalculateHadronContamination()
 {
     //gStyle->SetOptStat(0);
     
-    Bool_t DrawG = kFALSE;
+    Bool_t DrawG = kTRUE;
     //if (!DrawG) delete HadronContamination;
     //else
     //  HadronContamination->Divide(4,3);
@@ -801,11 +803,11 @@ Bool_t AliHFehpPbTool::CalculateHadronContamination()
         Double_t Contamination = (PionIntegral)/(PionIntegral+ElectronIntegral);
         
         //REMOVE THIS FOR PRODUCTION
-        //fHadronContamination->SetBinContent(i+1,1-Contamination);
-        //fHadronContamination->SetBinError(i+1,(1-Contamination)/100000000000000000000.);
+        fHadronContamination->SetBinContent(i+1,1-Contamination);
+        fHadronContamination->SetBinError(i+1,(1-Contamination)/100000000000000000000.);
         
-        fHadronContamination->SetBinContent(i+1,1);
-        fHadronContamination->SetBinError(i+1,(1)/100000000000000000000.);
+        //fHadronContamination->SetBinContent(i+1,1);
+        //fHadronContamination->SetBinError(i+1,(1)/100000000000000000000.);
 
         
         fTPCNSigmaCenter->SetBinContent(i+1, TotalFit->GetParameter(1));
@@ -1252,7 +1254,7 @@ Bool_t AliHFehpPbTool::CorrelationCT1D()
         Canvas[i] = new TCanvas(Form("CorrelationCT1D%d",i),Form("CorrelationCT1D%d",i),400,300);
         Canvas[i]->cd();
         Ratio1D[i] = (TH1F*) fHFEhNormalized1D[i]->Clone(Form("RatioDataMC1D%d",i));
-        Ratio1D[i]->Divide( Ratio1D[i], fHFEhMCNormalized1D[i]);
+        Ratio1D[i]->Divide( Ratio1D[i], fHFEhMCNormalized1D[i],1,1,"B");
         Ratio1D[i]->Fit("pol0");
         Canvas[i]->SaveAs(Form("CorrelationCT1D%d",i));
         
