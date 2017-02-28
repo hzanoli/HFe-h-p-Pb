@@ -1003,7 +1003,7 @@ void AliHFehpPbTool::CalculateFlow1D(AliHFehpPbTool* Reference, Bool_t FitConsta
         {
             FlowFunction[i] = new TF1(Form("fit%d",i),"[0]*(1 + 2 * [1] * TMath::Cos(x) + 2 * [2] * TMath::Cos(2*x))",-0.5*TMath::Pi(),1.5*TMath::Pi());
             FlowFunction[i]->SetParameters(10.,0.05, 0.1);
-            FlowFunction[i]->FixParameter(1,0);
+            //FlowFunction[i]->FixParameter(1,0);
         }
 
         JetReference[i] = Reference->GetHFeh1DSub(i);
@@ -1254,7 +1254,7 @@ Bool_t AliHFehpPbTool::CorrelationCT1D()
         Canvas[i] = new TCanvas(Form("CorrelationCT1D%d",i),Form("CorrelationCT1D%d",i),400,300);
         Canvas[i]->cd();
         Ratio1D[i] = (TH1F*) fHFEhNormalized1D[i]->Clone(Form("RatioDataMC1D%d",i));
-        Ratio1D[i]->Divide( Ratio1D[i], fHFEhMCNormalized1D[i],1,1,"B");
+        Ratio1D[i]->Divide( Ratio1D[i], fHFEhMCNormalized1D[i]);
         Ratio1D[i]->Fit("pol0");
         Canvas[i]->SaveAs(Form("CorrelationCT1D%d",i));
         
