@@ -203,6 +203,20 @@ Bool_t AliHFehpPbTool::ReadpTHistograms()
     
 }
 
+void AliHFehpPbTool::SetEfficiencyTaggingToConstant(Double_t Value)
+{
+    //Assume no EfficiencyHistogram
+    fEffTagging = new TH1F("fEffTagging", "Tagging Efficiency (set to constant", fpTBins.GetSize()-1, fpTBins.GetArray());
+    
+    for (Int_t i = 1; i <= fpTBins.GetSize()-1 ; i++)
+    {
+        fEffTagging->SetBinContent(i, Value);
+        fEffTagging->SetBinError(i, Value/1000000000000);
+    }
+    
+}
+
+
 Bool_t AliHFehpPbTool::CompareMixedEventDistributions()
 {
     ReadAndProcessCorrelationDistributions();
@@ -421,6 +435,7 @@ Bool_t AliHFehpPbTool::ReadAndProcessCorrelationDistributions(Int_t RebinX , Int
     }
     
     //if (fHFEh[fpTBins.GetSize() - 2])
+    delete fInputFile;
     return kTRUE;
     //else
     //  return kFALSE;
@@ -626,7 +641,7 @@ Bool_t AliHFehpPbTool::CalculateHadronContamination()
 {
     //gStyle->SetOptStat(0);
     
-    Bool_t DrawG = kTRUE;
+    Bool_t DrawG = kFALSE;
     //if (!DrawG) delete HadronContamination;
     //else
     //  HadronContamination->Divide(4,3);
