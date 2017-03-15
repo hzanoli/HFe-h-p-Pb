@@ -27,6 +27,7 @@ public:
     void SetpTBins(Int_t n, Double_t* array) { fpTBins.Set(n,array); };
     void SetpTBinsResults(Int_t n, Double_t* array) { fpTBinsResults.Set(n,array); };
     void SetLegendTitle(TString Legend) {fLegendTitle = Legend;};
+    void SetEfficiencyTaggingToConstant(Double_t Value);
 
     Bool_t ReadpTHistograms();
     Bool_t ProcesspTHistograms();
@@ -59,7 +60,7 @@ public:
     void CalculateFlow1D(AliHFehpPbTool* Reference,Bool_t FitConstant  = kFALSE);
     void FormatTH2Titles(TH2F* histo);
     
-    Bool_t ReadAndProcessCorrelationDistributions(Int_t RebinX = 2, Int_t RebinY = 2);
+    Bool_t ReadAndProcessCorrelationDistributions(Int_t RebinX = 2, Int_t RebinY = 4);
     TString TrainConfiguration(
                                Int_t pTBin = 0,
                                Bool_t Correlation = kTRUE,
@@ -138,7 +139,7 @@ public:
     TH2F* GetMC2DCT(Int_t pT){return fRatio2DMCCT[pT];};
     Double_t GetNEvents();
     
-    void SetUseEffElectrons(){fEffCorrectionForElectrons = kTRUE;};
+    void SetUseEffElectrons(Bool_t Use = kTRUE){fEffCorrectionForElectrons = Use;};
     void PreMerge();
     void SetTagEff(TH1F *eff) {fEffTagging =  (TH1F*) eff->Clone("fEffTagging"); };
     void SetHFeEff(TH1F *HFeEff) {fEffHFe = (TH1F*) HFeEff->Clone("fEffHFe"); };
