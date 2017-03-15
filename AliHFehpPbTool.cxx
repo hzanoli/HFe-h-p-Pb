@@ -908,12 +908,12 @@ void AliHFehpPbTool::Print2DCorrelation()
     
     for (int i = 0; i < fpTBinsResults.GetSize() - 1 ; i++)
     {
-        TCanvas merged("merged","merged",400,300);
-        merged.cd();
+        TCanvas *merged = new TCanvas(Form("merged%d",i) ,"merged",400,300);
+        merged->cd();
         FormatTH2Titles(fHFEhNormalized[i]);
         fHFEhNormalized[i]->Draw("surf1");
         fHFEhNormalized[i]->GetZaxis()->SetTitle("N_{eh}/N_{e}");
-        merged.Print(Form("Hfe_merged_%d_%d_%d.pdf",fConfigIndex,fCentralityIndex,i));
+        merged->Print(Form("Hfe_merged_%d_%d_%d.pdf",fConfigIndex,fCentralityIndex,i));
     }
 
        //fHFEhNormalized[pT]; //

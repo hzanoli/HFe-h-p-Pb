@@ -60,7 +60,7 @@ public:
     void CalculateFlow1D(AliHFehpPbTool* Reference,Bool_t FitConstant  = kFALSE);
     void FormatTH2Titles(TH2F* histo);
     
-    Bool_t ReadAndProcessCorrelationDistributions(Int_t RebinX = 2, Int_t RebinY = 2);
+    Bool_t ReadAndProcessCorrelationDistributions(Int_t RebinX = 2, Int_t RebinY = 4);
     TString TrainConfiguration(
                                Int_t pTBin = 0,
                                Bool_t Correlation = kTRUE,
