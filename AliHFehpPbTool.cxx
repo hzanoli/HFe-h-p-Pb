@@ -50,7 +50,7 @@ fHFeMCMixed(0),
 fEffHFe(0),
 fYieldAS(0),
 fYieldNS(0),
-fEffCorrectionForElectrons(kTRUE),
+fEffCorrectionForElectrons(kFALSE),
 fPreMerge(kFALSE),
 fTPCNSigmaCenter(0),
 fTPCNSigmaSTD(0),
@@ -97,7 +97,7 @@ fHFeMCMixed(0),
 fEffHFe(0),
 fYieldAS(0),
 fYieldNS(0),
-fEffCorrectionForElectrons(kTRUE),
+fEffCorrectionForElectrons(kFALSE),
 fPreMerge(kFALSE),
 fTPCNSigmaCenter(0),
 fTPCNSigmaSTD(0),
@@ -811,8 +811,8 @@ Bool_t AliHFehpPbTool::CalculateHadronContamination()
             
         }
         
-        Double_t ElectronIntegral = elec->Integral(-0.5,3.0);
-        Double_t PionIntegral = pion->Integral(-0.5,3.0);
+        Double_t ElectronIntegral = elec->Integral(-1.0,3.0);
+        Double_t PionIntegral = pion->Integral(-1.0,3.0);
         //Double_t ProtonkaonIntegral= protonkaon->Integral(-0.5,3.0);
         
         Double_t Contamination = (PionIntegral)/(PionIntegral+ElectronIntegral);
@@ -964,6 +964,82 @@ Bool_t AliHFehpPbTool::CalculateTaggingEfficiencyW()
     return kFALSE;
     
 }
+
+Bool_t AliHFehpPbTool::CalculateTaggingEfficiencyPureHijing()
+{
+    
+    printf("========================\n");
+    printf("eff Using only Hijing \n");
+    printf("========================\n");
+    
+    TH1F* ULS = (TH1F*) fInputList->FindObject("fElectronBKGNoEnhULS");
+    TH1F* LS = (TH1F*) fInputList->FindObject("fElectronBKGNoEnhLS");
+    TH1F *Total = (TH1F*) fInputList->FindObject("fElectronBKGNoEnhTotalNumber");
+    
+    ULS->Add(LS,-1);
+    
+    ULS = (TH1F*) ULS->Rebin(fpTBins.GetSize()-1, "BackgroundForTaggingEff", fpTBins.GetArray());
+    Total = (TH1F*) Total->Rebin(fpTBins.GetSize()-1, "TotalBackgroundForTaggingEff", fpTBins.GetArray());
+    
+    ULS->Divide(ULS,Total,1,1,"B");
+    
+    fEffTagging = (TH1F*) ULS->Clone("fEffTagging");
+    
+    if (fEffTagging)
+        return kTRUE;
+    
+    
+    return kFALSE;
+    
+}
+
+Bool_t AliHFehpPbTool::CalculateTaggingEfficiencyWToData()
+{
+    
+    printf("========================\n");
+    printf("Eff using W to Data \n");
+    printf("========================\n");
+    
+    if (!fInputList)
+        printf("No input list");
+    else
+        ("list ok");
+    
+    TH1F* ULS = (TH1F*) fInputList->FindObject("fElectronBKGWToDataULS");
+    TH1F* LS = (TH1F*) fInputList->FindObject("fElectronBKGWToDataLS");
+    TH1F *Total = (TH1F*) fInputList->FindObject("fElectronBKGWToDataTotal");
+    
+    if (!ULS || !LS || !Total)
+        printf("Error reading histograms for efficiency calculation\n");
+    else
+        printf("reading ok");
+    
+    
+    ULS->Add(LS,-1);
+    
+    ULS = (TH1F*) ULS->Rebin(fpTBins.GetSize()-1, "BackgroundForTaggingEff", fpTBins.GetArray());
+    Total = (TH1F*) Total->Rebin(fpTBins.GetSize()-1, "TotalBackgroundForTaggingEff", fpTBins.GetArray());
+    
+    ULS->Divide(ULS,Total,1,1,"B");
+    
+    fEffTagging = (TH1F*) ULS->Clone("fEffTagging");
+    
+    if (fEffTagging)
+        return kTRUE;
+    
+    
+    printf("========================\n");
+    printf("Finished Eff using W to Data \n");
+    printf("========================\n");
+
+    
+    return kFALSE;
+    
+    
+    
+}
+
+
 
 
 Bool_t AliHFehpPbTool::ReadTaggingEfficiencyFromFile()
@@ -1285,41 +1361,7 @@ Bool_t AliHFehpPbTool::CalculateV22PC()
     {
         fHFehProjectionForV2NonSub[pT] = (TH1F*)fHFEhNormalized1D[pT]->Clone(Form("fHFehProjectionForV2NonSub%d",pT));
         fHFehProjectionForV2NonSub[pT]->Reset();
-        //fBackNonIDEh[pT]->Divide(fBackMixedEh[pT]);
-        //fHFEhNormalized[pT] = fBackNonIDEh[pT];
-        //fHFEhNormalized[pT]->Draw("surf1");
         
-        /*
-         //Near side: only delta eta > 0.8 considered
-         for (Int_t ix = 1 ; ix <= (int)fHFEhNormalized[pT]->GetNbinsX()/2; ix++)
-         {
-         Double_t Mean;
-         Double_t Normalization;
-         
-         // -1.6 < delta eta  < -0.8
-         for (Int_t iy = fHFEhNormalized[pT]->GetYaxis()->FindBin(-1.55) ; iy <= fHFEhNormalized[pT]->GetYaxis()->FindBin(-0.85) ; iy++)
-         {
-         Mean += fHFEhNormalized[pT]->GetBinContent(ix,iy)/( pow(fHFEhNormalized[pT]->GetBinError(ix,iy),2) );
-         Normalization += 1./( pow(fHFEhNormalized[pT]->GetBinError(ix,iy),2) );
-         
-         //Mean += fHFEhNormalized[pT]->GetBinContent(ix,iy);
-         //Normalization += 1;
-         }
-         
-         // 0.8 < delta eta  < 1.6
-         for (Int_t iy = fHFEhNormalized[pT]->GetYaxis()->FindBin(0.85) ; iy <= fHFEhNormalized[pT]->GetYaxis()->FindBin(1.55) ; iy++)
-         {
-         Mean += fHFEhNormalized[pT]->GetBinContent(ix,iy)/( pow(fHFEhNormalized[pT]->GetBinError(ix,iy),2) );
-         Normalization += 1./( pow(fHFEhNormalized[pT]->GetBinError(ix,iy),2) );
-         }
-         
-         fHFehProjectionForV2NonSub[pT]->SetBinContent(ix, Mean/Normalization);
-         fHFehProjectionForV2NonSub[pT]->SetBinError(ix, TMath::Sqrt(1./Normalization));
-         
-         }
-         */
-        
-        //away side: all eta cosidered
         for (Int_t ix =  1 ; ix <= fHFEhNormalized[pT]->GetNbinsX(); ix++)
         {
             Double_t Mean = 0;
@@ -1365,7 +1407,6 @@ Bool_t AliHFehpPbTool::CalculateV22PC()
         }
         
         FlowFunction[pT] = new TF1(Form("FitV2NoSub%d",pT),"[0]*(1 + 2 * [1] * TMath::Cos(x) + 2 * [2] * TMath::Cos(2*x))",-0.5*TMath::Pi(),1.5*TMath::Pi());
-        //FlowFunction[pT]->FixParameter(1,0);
         fHFehProjectionForV2NonSub[pT]->Fit(FlowFunction[pT], "0");
         
         //fHFehProjectionForV2NonSub[pT]->Draw();
@@ -1374,6 +1415,395 @@ Bool_t AliHFehpPbTool::CalculateV22PC()
     
     
 }
+
+
+void AliHFehpPbTool::CalculateMCWeight()
+{
+    Double_t bins[83] = {0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 3.0, 3.1, 3.2, 3.3,3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 4.0, 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8, 4.9, 5, 5.2, 5.4, 5.6, 5.8, 6.0, 6.2, 6.4, 6.6, 6.8, 7.0, 7.2, 7.4, 7.6, 7.8, 8.0, 8.5, 9.0, 9.5, 10.0, 11, 12, 13, 14, 15, 16 , 18, 20, 25, 30, 35, 40, 50};
+    Int_t Nbins =82;
+    
+    TFile *FileW = new TFile("BackgroundW.root", "RECREATE");
+    
+    TH1F *temp = (TH1F*) fInputList->FindObject("fPtMCpi0_NoMother");
+    TH1F* PionEnh = (TH1F*) temp->Rebin(Nbins,"PionEnh",bins);
+    PionEnh->SetTitle("#pi^{0} from enhanced (with no mother);p_{T} (GeV/c);Counts/bin size ");
+    PionEnh->Scale(1.,"width");
+    
+    temp = (TH1F*) fInputList->FindObject("fPtMCEta_NoMother");
+    TH1F *EtaEnh = (TH1F*) temp->Rebin(Nbins,"EtaEnh",bins);
+    EtaEnh->SetTitle("#eta from enhanced (with no mother);p_{T} (GeV/c);Counts/bin size ");
+    EtaEnh->Scale(1.,"width");
+    
+    temp = (TH1F*) fInputList->FindObject("fPtMCpi0_PureHijing");
+    TH1F* PionHijing = (TH1F*) temp->Rebin(Nbins,"PionHijing",bins);
+    PionHijing->SetTitle("#pi from non-enhanced;p_{T} (GeV/c);Counts/bin size ");
+    PionHijing->Scale(1.,"width");
+    
+    temp = (TH1F*) fInputList->FindObject("fPtMCEta_PureHijing");
+    TH1F *EtaHijing = (TH1F*) temp->Rebin(Nbins,"EtaHijing",bins);
+    EtaHijing->Scale(1.,"width");
+    EtaHijing->SetTitle("#eta from non-enhanced;p_{T} (GeV/c);Counts/bin size ");
+    TCanvas *PionCanvas = new TCanvas("Pion","Pion",400,300);
+    TCanvas *EtaCanvas = new TCanvas("Eta","Eta",400,300);
+    
+    TCanvas *PionCanvasW = new TCanvas("PionW","PionW",400,300);
+    TCanvas *EtaCanvasW = new TCanvas("EtaW","EtaW",400,300);
+    
+    PionCanvas->cd();
+    PionCanvas->SetLogy();
+    PionHijing->SetMarkerSize(0.3);
+    PionHijing->SetMarkerStyle(kOpenCircle);
+    PionHijing->SetLineColor(kBlack);
+    PionHijing->SetMarkerColor(kBlack);
+    PionHijing->DrawCopy();
+    
+    PionEnh->SetLineColor(kRed);
+    PionEnh->SetMarkerColor(kRed);
+    PionEnh->SetMarkerSize(0.3);
+    PionEnh->SetMarkerStyle(kOpenCircle);
+    PionEnh->DrawCopy("same");
+    PionCanvas->BuildLegend();
+    PionCanvas->SaveAs("PionDistributions.pdf");
+    
+    EtaCanvas->cd();
+    EtaCanvas->SetLogy();
+    EtaHijing->SetMarkerStyle(kOpenCircle);
+    EtaHijing->SetMarkerSize(0.3);
+    EtaHijing->SetMarkerColor(kBlack);
+    EtaHijing->SetLineColor(kBlack);
+    EtaHijing->GetYaxis()->SetRangeUser(0.01,10E9);
+    EtaHijing->DrawCopy();
+
+    EtaEnh->SetLineColor(kRed);
+    EtaEnh->SetMarkerStyle(kOpenCircle);
+    EtaEnh->SetMarkerColor(kRed);
+    EtaEnh->SetMarkerSize(0.3);
+    EtaEnh->DrawCopy("same");
+    EtaCanvas->BuildLegend();
+    EtaCanvas->SaveAs("EtaDistributions.pdf");
+    
+    PionCanvasW->cd();
+    EtaCanvasW->SetLogy();
+    PionHijing->Divide(PionEnh);
+    PionHijing->Draw();
+    PionHijing->SetTitle("Weight for #pi^{0}");
+    FileW->cd();
+    PionHijing->Write("Pi0W");
+    
+    EtaCanvasW->cd();
+    EtaCanvasW->SetLogy();
+    EtaHijing->Divide(EtaEnh);
+    EtaHijing->SetTitle("Weight for #eta");
+    EtaHijing->Draw();
+    FileW->cd();
+    EtaHijing->Write("EtaW");
+}
+
+void AliHFehpPbTool::CompareMCMotherDistributions(TString FilemTScalling)
+{
+    TFile *mTScalling = new TFile(FilemTScalling.Data());
+    TF1* HagFunctionPi0 = (TF1*) mTScalling->Get("HagFunctionPi0");
+    TF1* HagFunctionEta = (TF1*) mTScalling->Get("HagFunctionEta");
+    
+    TH1F* PionHijing = (TH1F*) fInputList->FindObject("fPtMCpi0_PureHijing");
+    TH1F* PionEnh = (TH1F*) fInputList->FindObject("fPtMCpi0_NoMother");
+    
+    TH1F* EtaHijing = (TH1F*) fInputList->FindObject("fPtMCEta_PureHijing");
+    TH1F* EtaEnh = (TH1F*) fInputList->FindObject("fPtMCEta_NoMother");
+
+    
+    TH1F* RatioPurHijingPion = (TH1F*) PionHijing->Clone("RatioPurHijingPion");
+    TH1F* RatioPurHijingEta = (TH1F*) EtaHijing->Clone("RatioPurHijingEta");
+    
+    for (Int_t i = 1; i <= RatioPurHijingPion->GetNbinsX(); i++)
+    {
+        RatioPurHijingPion->SetBinContent(i,RatioPurHijingPion->GetBinContent(i)/RatioPurHijingPion->GetBinCenter(i));
+        RatioPurHijingPion->SetBinError(i,RatioPurHijingPion->GetBinError(i)/RatioPurHijingPion->GetBinCenter(i));
+        
+        RatioPurHijingEta->SetBinContent(i,RatioPurHijingEta->GetBinContent(i)/RatioPurHijingEta->GetBinCenter(i));
+        RatioPurHijingEta->SetBinError(i,RatioPurHijingEta->GetBinError(i)/RatioPurHijingEta->GetBinCenter(i));
+    }
+    
+    RatioPurHijingPion->Scale(1.,"width");
+    RatioPurHijingPion->Divide(HagFunctionPi0);
+    
+    RatioPurHijingEta->Scale(1.,"width");
+    RatioPurHijingEta->SetLineColor(kRed);
+    RatioPurHijingEta->SetMarkerColor(kRed);
+    RatioPurHijingEta->Divide(HagFunctionEta);
+    
+    TCanvas *RatiosToMtScale = new TCanvas("Ratio","Ratio",400,300);
+    RatiosToMtScale->SetLogy();
+    
+    RatioPurHijingPion->GetXaxis()->SetRangeUser(0,20);
+    RatioPurHijingEta->GetXaxis()->SetRangeUser(0,20);
+    RatioPurHijingPion->Draw("same");
+    RatioPurHijingPion->GetYaxis()->SetTitle("Ratio Hijing/m_{T} scaled data");
+    RatioPurHijingPion->SetTitle("#pi^{0}");
+    RatioPurHijingEta->SetTitle("#eta");
+    RatioPurHijingEta->Draw("same");
+    
+    RatiosToMtScale->BuildLegend();
+    
+    RatiosToMtScale->SaveAs("RatioHijinToMtScale.pdf");
+    
+    PionHijing->Add(PionEnh);
+    EtaHijing->Add(EtaEnh);
+    
+    //PionHijing->Scale(1./PionHijing->GetEntries());
+    PionHijing->Scale(1.,"width");
+    
+    for (Int_t i = 1; i <= PionHijing->GetNbinsX(); i++)
+    {
+        PionHijing->SetBinContent(i,PionHijing->GetBinContent(i)/PionHijing->GetBinCenter(i));
+        PionHijing->SetBinError(i,PionHijing->GetBinError(i)/PionHijing->GetBinCenter(i));
+        
+        EtaHijing->SetBinContent(i,EtaHijing->GetBinContent(i)/EtaHijing->GetBinCenter(i));
+        EtaHijing->SetBinError(i,EtaHijing->GetBinError(i)/EtaHijing->GetBinCenter(i));
+
+    }
+    
+    TCanvas *Weight = new TCanvas("Fit", "Fit", 400,300);
+    Weight->SetLogy();
+    PionHijing->Divide(HagFunctionPi0);
+    PionHijing->SetTitle("#pi ;p_{T} GeV/c;MC/Data");
+    PionHijing->GetXaxis()->SetRangeUser(0,50);
+    PionHijing->Draw();
+    
+    EtaHijing->Divide(HagFunctionEta);
+    EtaHijing->SetTitle("#eta;p_{T} GeV/c;MC/Data");
+    EtaHijing->GetXaxis()->SetRangeUser(0,50);
+    EtaHijing->SetLineColor(kRed);
+    EtaHijing->SetMarkerColor(kRed);
+    EtaHijing->Draw("same");
+    
+    Weight->BuildLegend();
+    
+    TFile *ExportInverseW = new TFile("BackgroundWtoData.root", "RECREATE");
+    PionHijing->Write("Pi0");
+    EtaHijing->Write("Eta");
+    ExportInverseW->Clone();
+    
+
+}
+
+
+void AliHFehpPbTool::CalculateWToData()
+{
+    
+    TF1 *HagFunctionPi0 = new TF1("levy","1.245*((7.331-1.)*(7.331-2.))/(7.331*0.1718*(7.331*0.1718+0.135*(7.331-2.)))*pow(1.+(sqrt(0.135*0.135+x*x)-0.135)/(7.331*0.1718),-7.331)",0,50);//p-Pb pi0 AllCent
+    
+    TF1 *HagFunctionEta =new TF1("levy1","0.48*((((7.331-1.)*(7.331-2.))/(7.331*0.1718*(7.331*0.1718+0.13498*(7.331-2.)))*pow(1.+(sqrt(0.13498*0.13498+25)-0.13498)/(7.331*0.1718),-7.331)) / (((7.331-1.)*(7.331-2.))/(7.331*0.1718*(7.331*0.1718+0.13498*(7.331-2.)))*pow(1.+(sqrt(0.54751*0.54751+25)-0.13498)/(7.331*0.1718),-7.331)))*(x/sqrt(x*x + 0.54751*0.54751 - 0.13498*0.13498))*1.245*((7.331-1.)*(7.331-2.))/(7.331*0.1718*(7.331*0.1718+0.13498*(7.331-2.)))*pow(1.+(sqrt(0.54751*0.54751+x*x)-0.13498)/(7.331*0.1718),-7.331)",0,50);
+    
+    
+    TH1F* PionHijing = (TH1F*) fInputList->FindObject("fPtMCpi0_PureHijing");
+    TH1F* PionEnh = (TH1F*) fInputList->FindObject("fPtMCpi0_NoMother");
+    
+    TH1F* EtaHijing = (TH1F*) fInputList->FindObject("fPtMCEta_PureHijing");
+    TH1F* EtaEnh = (TH1F*) fInputList->FindObject("fPtMCEta_NoMother");
+    
+    
+    TH1F* RatioPurHijingPion = (TH1F*) PionHijing->Clone("RatioPurHijingPion");
+    TH1F* RatioPurHijingEta = (TH1F*) EtaHijing->Clone("RatioPurHijingEta");
+    
+    for (Int_t i = 1; i <= RatioPurHijingPion->GetNbinsX(); i++)
+    {
+        RatioPurHijingPion->SetBinContent(i,RatioPurHijingPion->GetBinContent(i)/RatioPurHijingPion->GetBinCenter(i));
+        RatioPurHijingPion->SetBinError(i,RatioPurHijingPion->GetBinError(i)/RatioPurHijingPion->GetBinCenter(i));
+        
+        RatioPurHijingEta->SetBinContent(i,RatioPurHijingEta->GetBinContent(i)/RatioPurHijingEta->GetBinCenter(i));
+        RatioPurHijingEta->SetBinError(i,RatioPurHijingEta->GetBinError(i)/RatioPurHijingEta->GetBinCenter(i));
+    }
+    
+    RatioPurHijingPion->Scale(1.,"width");
+    RatioPurHijingPion->Divide(HagFunctionPi0);
+    
+    RatioPurHijingEta->Scale(1.,"width");
+    RatioPurHijingEta->SetLineColor(kRed);
+    RatioPurHijingEta->SetMarkerColor(kRed);
+    RatioPurHijingEta->Divide(HagFunctionEta);
+    
+    TCanvas *RatiosToMtScale = new TCanvas("Ratio","Ratio",400,300);
+    RatiosToMtScale->SetLogy();
+    
+    RatioPurHijingPion->GetXaxis()->SetRangeUser(0,20);
+    RatioPurHijingEta->GetXaxis()->SetRangeUser(0,20);
+    RatioPurHijingPion->Draw("same");
+    RatioPurHijingPion->GetYaxis()->SetTitle("Ratio Hijing/m_{T} scaled data");
+    RatioPurHijingPion->SetTitle("#pi^{0}");
+    RatioPurHijingEta->SetTitle("#eta");
+    RatioPurHijingEta->Draw("same");
+    
+    RatiosToMtScale->BuildLegend();
+    
+    RatiosToMtScale->SaveAs("RatioHijinToWeight.pdf");
+    
+    PionHijing->Add(PionEnh);
+    EtaHijing->Add(EtaEnh);
+    
+    //PionHijing->Scale(1./PionHijing->GetEntries());
+    PionHijing->Scale(1.,"width");
+    
+    for (Int_t i = 1; i <= PionHijing->GetNbinsX(); i++)
+    {
+        PionHijing->SetBinContent(i,PionHijing->GetBinContent(i)/PionHijing->GetBinCenter(i));
+        PionHijing->SetBinError(i,PionHijing->GetBinError(i)/PionHijing->GetBinCenter(i));
+        
+        EtaHijing->SetBinContent(i,EtaHijing->GetBinContent(i)/EtaHijing->GetBinCenter(i));
+        EtaHijing->SetBinError(i,EtaHijing->GetBinError(i)/EtaHijing->GetBinCenter(i));
+        
+    }
+    
+    TCanvas *Weight = new TCanvas("Fit", "Fit", 400,300);
+    Weight->SetLogy();
+    PionHijing->Divide(HagFunctionPi0);
+    PionHijing->SetTitle("#pi ;p_{T} GeV/c;MC/Data");
+    PionHijing->GetXaxis()->SetRangeUser(0,50);
+    
+    
+    EtaHijing->Divide(HagFunctionEta);
+    EtaHijing->SetTitle("#eta;p_{T} GeV/c;MC/Data");
+    EtaHijing->GetXaxis()->SetRangeUser(0,50);
+    EtaHijing->SetLineColor(kRed);
+    EtaHijing->SetMarkerColor(kRed);
+    
+    PionHijing->GetSumw2()->Set(0);
+    EtaHijing->GetSumw2()->Set(0);
+    
+    
+    for (Int_t i = 1; i <= PionHijing->GetNbinsX(); i++)
+    {
+       PionHijing->SetBinContent(i, 1./PionHijing->GetBinContent(i));
+       EtaHijing->SetBinContent(i,1./EtaHijing->GetBinContent(i));
+        
+    }
+    
+    PionHijing->Draw();
+    EtaHijing->Draw("same");
+    
+    Weight->BuildLegend();
+    
+    TFile *ExportInverseW = new TFile("BackgroundWtoData2.root", "RECREATE");
+    PionHijing->Write("Pi0");
+    EtaHijing->Write("Eta");
+    ExportInverseW->Clone();
+    
+    
+}
+
+void AliHFehpPbTool::CalculateWToDataPrelimiray()
+{
+    Double_t Nevents = GetNEvents();
+    //[0]  = A, [1] = nTsallis, [2] = T, [3] = mass
+    
+    TF1 *HagFunctionPi0 = new TF1("pi0", "[0]/2*TMath::Pi() * (([1]-1)*([1]-2))/([1]*[2]*([1]*[2]+[3]*([1]-2))) * pow ((1 + (TMath::Sqrt(x*x + [3]*[3])- [3])/([1]*[2])),-[1])" ,0,50);//p-Pb pi0 AllCent
+    
+    HagFunctionPi0->SetParameters(8.15719, 7.19545, 0.168252, 134.9766/1000.);
+    
+    TF1 *HagFunctionEta = new TF1("eta", "[0]/2*TMath::Pi() * (([1]-1)*([1]-2))/([1]*[2]*([1]*[2]+[3]*([1]-2))) * pow ((1 + (TMath::Sqrt(x*x + [3]*[3])- [3])/([1]*[2])),-[1])" ,0,50);
+    
+    HagFunctionEta->SetParameters(0.909368, 7.50074, 0.269817, 547.862/1000.);
+    
+    TH1F* PionHijing = (TH1F*) fInputList->FindObject("fPtMCpi0_PureHijing");
+    TH1F* PionEnh = (TH1F*) fInputList->FindObject("fPtMCpi0_NoMother");
+    
+    TH1F* EtaHijing = (TH1F*) fInputList->FindObject("fPtMCEta_PureHijing");
+    TH1F* EtaEnh = (TH1F*) fInputList->FindObject("fPtMCEta_NoMother");
+    
+    
+    TH1F* RatioPurHijingPion = (TH1F*) PionHijing->Clone("RatioPurHijingPion");
+    TH1F* RatioPurHijingEta = (TH1F*) EtaHijing->Clone("RatioPurHijingEta");
+    
+    for (Int_t i = 1; i <= RatioPurHijingPion->GetNbinsX(); i++)
+    {
+        RatioPurHijingPion->SetBinContent(i,RatioPurHijingPion->GetBinContent(i)/RatioPurHijingPion->GetBinCenter(i));
+        RatioPurHijingPion->SetBinError(i,RatioPurHijingPion->GetBinError(i)/RatioPurHijingPion->GetBinCenter(i));
+        
+        RatioPurHijingEta->SetBinContent(i,RatioPurHijingEta->GetBinContent(i)/RatioPurHijingEta->GetBinCenter(i));
+        RatioPurHijingEta->SetBinError(i,RatioPurHijingEta->GetBinError(i)/RatioPurHijingEta->GetBinCenter(i));
+    }
+    
+    RatioPurHijingPion->Scale(1.,"width");
+    RatioPurHijingPion->Divide(HagFunctionPi0);
+    
+    RatioPurHijingEta->Scale(1.,"width");
+    RatioPurHijingEta->SetLineColor(kRed);
+    RatioPurHijingEta->SetMarkerColor(kRed);
+    RatioPurHijingEta->Divide(HagFunctionEta);
+    
+    TCanvas *RatiosToMtScale = new TCanvas("Ratio","Ratio",400,300);
+    RatiosToMtScale->SetLogy();
+    
+    RatioPurHijingPion->GetXaxis()->SetRangeUser(0,20);
+    RatioPurHijingEta->GetXaxis()->SetRangeUser(0,20);
+    RatioPurHijingPion->Draw("same");
+    RatioPurHijingPion->GetYaxis()->SetTitle("Ratio Hijing/m_{T} scaled data");
+    RatioPurHijingPion->SetTitle("#pi^{0}");
+    RatioPurHijingEta->SetTitle("#eta");
+    RatioPurHijingEta->Draw("same");
+    
+    RatiosToMtScale->BuildLegend();
+    
+    RatiosToMtScale->SaveAs("RatioHijinToWeight.pdf");
+    
+    PionHijing->Add(PionEnh);
+    EtaHijing->Add(EtaEnh);
+    
+    PionHijing->Scale(1./Nevents);
+    EtaHijing->Scale(1./Nevents);
+    
+    PionHijing->Scale(1.,"width");
+    EtaHijing->Scale(1.,"width");
+    
+    for (Int_t i = 1; i <= PionHijing->GetNbinsX(); i++)
+    {
+        PionHijing->SetBinContent(i,PionHijing->GetBinContent(i)/PionHijing->GetBinCenter(i));
+        PionHijing->SetBinError(i,PionHijing->GetBinError(i)/PionHijing->GetBinCenter(i));
+        
+        EtaHijing->SetBinContent(i,EtaHijing->GetBinContent(i)/EtaHijing->GetBinCenter(i));
+        EtaHijing->SetBinError(i,EtaHijing->GetBinError(i)/EtaHijing->GetBinCenter(i));
+        
+    }
+    
+    TCanvas *Weight = new TCanvas("Fit", "Fit", 400,300);
+    Weight->SetLogy();
+    PionHijing->Divide(HagFunctionPi0);
+    PionHijing->SetTitle("#pi ;p_{T} GeV/c;MC/Data");
+    PionHijing->GetXaxis()->SetRangeUser(0,50);
+    
+    
+    EtaHijing->Divide(HagFunctionEta);
+    EtaHijing->SetTitle("#eta;p_{T} GeV/c;MC/Data");
+    EtaHijing->GetXaxis()->SetRangeUser(0,50);
+    EtaHijing->SetLineColor(kRed);
+    EtaHijing->SetMarkerColor(kRed);
+    
+    PionHijing->GetSumw2()->Set(0);
+    EtaHijing->GetSumw2()->Set(0);
+    
+    
+    for (Int_t i = 1; i <= PionHijing->GetNbinsX(); i++)
+    {
+        PionHijing->SetBinContent(i, 1./PionHijing->GetBinContent(i));
+        EtaHijing->SetBinContent(i,1./EtaHijing->GetBinContent(i));
+        
+    }
+    
+    PionHijing->Draw();
+    EtaHijing->Draw("same");
+    
+    Weight->BuildLegend();
+    
+    TFile *ExportInverseW = new TFile("BackgroundWtoData_Premilinary.root", "RECREATE");
+    PionHijing->Write("Pi0");
+    EtaHijing->Write("Eta");
+    ExportInverseW->Clone();
+    
+    
+
+}
+
+
 
 
 AliHFehpPbTool::~AliHFehpPbTool() {}

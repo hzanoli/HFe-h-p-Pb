@@ -51,9 +51,15 @@ public:
     Bool_t CorrelationCT1D();
     Bool_t ReadTaggingEfficiencyFromFile();
     Bool_t CalculateTaggingEfficiencyW();
+    Bool_t CalculateTaggingEfficiencyPureHijing();
+    Bool_t CalculateTaggingEfficiencyWToData();
     Bool_t SubtractPedestal(Double_t Pedestal,Int_t pT);
     Bool_t CalculateYield(Bool_t Flow =kFALSE);
     Bool_t CalculateV22PC();
+    void CalculateMCWeight();
+    void CompareMCMotherDistributions(TString FilemTScalling);
+    void CalculateWToData();
+    void CalculateWToDataPrelimiray();
     
     
     void Process();
