@@ -28,11 +28,17 @@ public:
     void SetpTBinsResults(Int_t n, Double_t* array) { fpTBinsResults.Set(n,array); };
     void SetLegendTitle(TString Legend) {fLegendTitle = Legend;};
     void SetEfficiencyTaggingToConstant(Double_t Value);
+    
+    void LocalMerge(TString ExportName);
+    
 
     Bool_t ReadpTHistograms();
     Bool_t ProcesspTHistograms();
     Bool_t MergeCorrelationDistributions();
-    
+    void CalculateWToDataNoFit();
+    void CalculateWToDataPionFromAndreaNoEnh();
+    void CalculateWToDataNoFitPion();
+    void CalculateWToDataNoFitPionEnh();
     
     Bool_t ConnectToInputFile(TString FileName, TString ConfigurationName);
     Bool_t CalculateHadronContamination();
@@ -59,8 +65,9 @@ public:
     void CalculateMCWeight();
     void CompareMCMotherDistributions(TString FilemTScalling);
     void CalculateWToData();
-    void CalculateWToDataPrelimiray();
-    
+    //void CalculateWToDataPrelimiray(Bool_t UseEnhanced = kFALSE);
+    void CalculateWToDataNoEnh();
+    void CalculateWToDataUseEnh();
     
     void Process();
     void CalculateFlow1D(AliHFehpPbTool* Reference,Bool_t FitConstant  = kFALSE);
@@ -143,6 +150,7 @@ public:
     TH1F* GetTPCNSigmaCenter() {return fTPCNSigmaCenter;};
     TH1F* GetTPCNSigmaSTD() {return fTPCNSigmaSTD;};
     TH2F* GetMC2DCT(Int_t pT){return fRatio2DMCCT[pT];};
+    Bool_t CalculateTaggingEfficiencyWToDataNoEnh();
     Double_t GetNEvents();
     
     void SetUseEffElectrons(Bool_t Use = kTRUE){fEffCorrectionForElectrons = Use;};

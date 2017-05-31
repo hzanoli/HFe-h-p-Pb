@@ -58,7 +58,7 @@ fConfigIndex(0),
 fCentralityIndex(0),
 fLegendTitle(0)
 {
-   // TH1::AddDirectory(kFALSE);
+    // TH1::AddDirectory(kFALSE);
 }
 
 
@@ -291,7 +291,7 @@ Bool_t AliHFehpPbTool::ReadAndProcessCorrelationDistributions(Int_t RebinX , Int
     fHFEhSame =new TH2F *[fpTBins.GetSize()-1];
     fHFEhMixed =new TH2F *[fpTBins.GetSize()-1];
     
-  
+    
     
     for (Int_t i = 0; i < fpTBins.GetSize() -1 ; i++)
     {
@@ -371,7 +371,7 @@ Bool_t AliHFehpPbTool::ReadAndProcessCorrelationDistributions(Int_t RebinX , Int
         fSameBackNoPULSEh[i]->RebinX(RebinX);
         fSameBackNoPLSEh[i]->RebinY(RebinY);
         fSameBackNoPLSEh[i]->RebinX(RebinX);
-
+        
         
         fBackEh[i] = (TH2F*) fSameBackULSEh[i]->Clone(Form("fBackEh%d",i));
         fBackNonIDEh[i] = (TH2F*) fSameBackNoPULSEh[i]->Clone(Form("fBackNonIDEh%d",i));
@@ -380,8 +380,8 @@ Bool_t AliHFehpPbTool::ReadAndProcessCorrelationDistributions(Int_t RebinX , Int
         //ID Back
         
         fBackEh[i]->Add(fSameBackLSEh[i],-1);
-       
-               
+        
+        
         //NonID Back
         
         fBackNonIDEh[i]->Add(fSameBackNoPLSEh[i],-1);
@@ -403,7 +403,7 @@ Bool_t AliHFehpPbTool::ReadAndProcessCorrelationDistributions(Int_t RebinX , Int
             }
         }
         
-         
+        
         
         //HFe Same Distibution
         fHFEhSame[i]->Add(fBackNonIDEh[i],-1);
@@ -447,28 +447,38 @@ Bool_t AliHFehpPbTool::ReadAndProcessCorrelationDistributions(Int_t RebinX , Int
 
 Bool_t AliHFehpPbTool::MergeCorrelationDistributions()
 {
-    fHFEhNormalized = new TH2F *[fpTBinsResults.GetSize() -1];
-    
-    //Assuming both always start at the same bin
-    Int_t lastj = 0;
-    for (Int_t i = 0 ; i < fpTBinsResults.GetSize() -1 ; i++ )
+    if (fpTBinsResults.GetSize() == fpTBins.GetSize())
     {
-        fHFEhNormalized[i] = (TH2F*) fHFEh[0]->Clone(Form("fHFEhNormalized%d",i));
-        fHFEhNormalized[i]->Reset();
+        printf("Not merging, since results and input have the same binning\n");
+        fHFEhNormalized = new TH2F *[fpTBinsResults.GetSize() -1];
         
-        for (Int_t j = lastj ; j < fpTBins.GetSize()-1 ; j++)
+        for (Int_t i = 0 ; i < fpTBinsResults.GetSize() -1 ; i++ )
+            fHFEhNormalized[i] = (TH2F*) fHFEh[i]->Clone(Form("fHFEhNormalized%d",i));
+    }
+    else {
+        fHFEhNormalized = new TH2F *[fpTBinsResults.GetSize() -1];
+        
+        //Assuming both always start at the same bin
+        Int_t lastj = 0;
+        for (Int_t i = 0 ; i < fpTBinsResults.GetSize() -1 ; i++ )
         {
-            if (fpTBinsResults.At(i+1) >= fpTBins.At(j+1))
+            fHFEhNormalized[i] = (TH2F*) fHFEh[0]->Clone(Form("fHFEhNormalized%d",i));
+            fHFEhNormalized[i]->Reset();
+            
+            for (Int_t j = lastj ; j < fpTBins.GetSize()-1 ; j++)
             {
-                fHFEhNormalized[i]->Add(fHFEh[j]);
+                if (fpTBinsResults.At(i+1) >= fpTBins.At(j+1))
+                {
+                    fHFEhNormalized[i]->Add(fHFEh[j]);
+                }
+                else
+                {
+                    lastj = j;
+                    break;
+                }
             }
-            else
-            {
-                lastj = j;
-                break;
-            }
+            fHFEhNormalized[i]->SetTitle(Form("%1.2f < p_{T}^{e} < %1.2f",fpTBinsResults.At(i), fpTBinsResults.At(i+1)));
         }
-        fHFEhNormalized[i]->SetTitle(Form("%1.2f < p_{T}^{e} < %1.2f",fpTBinsResults.At(i), fpTBinsResults.At(i+1)));
     }
     
     if (fHFEhNormalized[0])
@@ -639,12 +649,21 @@ Bool_t AliHFehpPbTool::ProcesspTHistograms()
 //Dont need to use MC information
 Bool_t AliHFehpPbTool::CalculateHadronContamination()
 {
-    //gStyle->SetOptStat(0);
+    TH1F* ContamiantionUsingCuts[7];
     
-    Bool_t DrawG = kFALSE;
-    //if (!DrawG) delete HadronContamination;
-    //else
-    //  HadronContamination->Divide(4,3);
+    for (Int_t a = 0; a < 7; a++) {
+        ContamiantionUsingCuts[a] = new TH1F("ContamiantionUsingCuts","Hadron Cont.; p (GeV/c) ", fpTBins.GetSize()-1, fpTBins.GetArray());
+    }
+    
+    TCanvas *ContaminationPlots = new TCanvas("Contamination", "Contamination", 400,300);
+    
+    Double_t MinimumValueToUseRightSideFit = 0.5;
+    Double_t MaximumValueToUseRightSideFit = 1.0;
+    
+    
+    Bool_t lPerformCutStudies = kTRUE;
+    Bool_t DrawG = kTRUE;
+    Bool_t FixElectronposition = kFALSE;
     
     TH2F **TPCTOFNsigma = new TH2F *[fpTBins.GetSize()];
     TH1F **TPCNsigma = new TH1F *[fpTBins.GetSize()];
@@ -657,153 +676,149 @@ Bool_t AliHFehpPbTool::CalculateHadronContamination()
     for (Int_t i = 0; i < fpTBins.GetSize() -1; i++)
     {
         TPCTOFNsigma[i] = (TH2F*)fInputList->FindObject(Form("fTOFTPCnsigma_pt%d",i));
-        
-        if ( (i == (fpTBins.GetSize() - 2))  && (fPreMerge == kTRUE ))
-        {
-            TPCTOFNsigma[i]->Add( (TH2F*)fInputList->FindObject(Form("fTOFTPCnsigma_pt%d",i+1)));
-        }
-        TPCTOFNsigma[i]->SetTitle(Form("%1.2f < p_{T}^{e} < %1.2f",fpTBins.At(i), fpTBins.At(i+1)));
+        TPCNsigma[i] = (TH1F*) TPCTOFNsigma[i]->ProjectionY(Form("TPCnsigma_pt%d",i), TPCTOFNsigma[i]->GetXaxis()->FindBin(-fTOFNSigma), TPCTOFNsigma[i]->GetXaxis()->FindBin(fTOFNSigma)) ;
         
         if  (DrawG)
         {
             TCanvas *Plot2DTPCTOF = new TCanvas(Form("Plot2DTPCTOF%d",i),Form("Plot2DTPCTOF%d",i), 900,600 );
             Plot2DTPCTOF->SetLogz();
             TPCTOFNsigma[i]->Draw("colz");
-            Plot2DTPCTOF->SaveAs(Form("Plot2DTPCTOF_Cent_%d_pT%d_Config%d.pdf",fCentralityIndex, i,fConfigIndex));
-        }
-        if (!TPCTOFNsigma[i])
-        {
-            printf("Error reading HadronContamination histogram %d\n", i);
-            return kFALSE;
+            Plot2DTPCTOF->SaveAs(Form("Plot2DTPCTOF_Cent_%d_pT%d_Config%d.png",fCentralityIndex, i,fConfigIndex));
         }
         
-        TPCNsigma[i] = (TH1F*) TPCTOFNsigma[i]->ProjectionY(Form("TPCnsigma_pt%d",i), TPCTOFNsigma[i]->GetXaxis()->FindBin(-fTOFNSigma), TPCTOFNsigma[i]->GetXaxis()->FindBin(fTOFNSigma)) ;
         TPCNsigma[i]->GetYaxis()->SetTitle("Counts");
         
-        TPCNsigma[i]->Rebin(4);
-        if (fpTBins.At(i) > 4.0)
+        TPCNsigma[i]->SetTitle(Form("%1.2f < p_{T}^{e} < %1.2f ",fpTBins.At(i),fpTBins.At(i+1)));
+        
+        //TPCNsigma[i]->Rebin();
+        if (fpTBins.At(i) >= 4.0)
             TPCNsigma[i]->Rebin(2);
         
         
-        TF1 *pion = new TF1("Pions", "exp([0]*x)*landau(1)",-12,8);
+        //Use Pion as 2 gaussians
         
-        pion->SetParameters(-4,TPCNsigma[i]->GetBinContent(TPCNsigma[i]->GetXaxis()->FindBin(-6)), -6.1, 2.5);
+        TF1 *pion = new TF1("Pions", "gausn(0)+gausn(3)",-12,8);
         
-        if (fpTBins.At(i) > 3)
-            pion->SetParameters(-4,TPCNsigma[i]->GetBinContent(TPCNsigma[i]->GetXaxis()->FindBin(-3)), -3, 2);
-        if (fpTBins.At(i) > 4)
-            pion->SetParameters(-4,TPCNsigma[i]->GetBinContent(TPCNsigma[i]->GetXaxis()->FindBin(-4)), -3, 2);
+        pion->SetParameters(TPCNsigma[i]->GetBinContent(TPCNsigma[i]->GetMaximumBin()), TPCNsigma[i]->GetXaxis()->GetBinLowEdge(TPCNsigma[i]->GetMaximumBin()), 0.8, 0.1 * TPCNsigma[i]->GetBinContent(TPCNsigma[i]->GetMaximumBin()), TPCNsigma[i]->GetXaxis()->GetBinLowEdge(TPCNsigma[i]->GetMaximumBin()), 0.8 );
         
-        if (fpTBins.At(i) >= 4)
-            TPCNsigma[i]->Fit(pion,"RN","", -4, -2);
-        else
-            TPCNsigma[i]->Fit(pion,"RN","", -7, -2);
-        //TPCNsigma[i]->Fit("landau","IR","", -7, -2);
+        Double_t PionFitMin,PionFitMax(-2);
         
-        TF1 *protonkaon = new TF1("Protons and Kaons", "gaus(0)", -12,8);
+        PionFitMin = TPCNsigma[i]->GetXaxis()->GetBinLowEdge(TPCNsigma[i]->GetMaximumBin()) - 0.7;
         
-        protonkaon->SetParLimits(1, -10,-4);
-        if (fpTBins.At(i) > 1.4)
-        {
-            protonkaon->SetParameters(TPCNsigma[i]->GetBinContent(TPCNsigma[i]->GetXaxis()->FindBin(-9)), -9, 1);
-            TPCNsigma[i]->Fit(protonkaon,"RN","", -12, -6);
-        }
-        else
-        {
-            protonkaon->SetParameters(0, 0, 0);
-        }
+        TPCNsigma[i]->Fit(pion,"QN","", PionFitMin, PionFitMax);
         
-        
-        TF1 *elec = new TF1("Electrons", "gaus", -12, 8);
+        TF1 *elec = new TF1("Electrons", "gausn(0)", -10, 10);
         elec->SetParameters(TPCNsigma[i]->GetBinContent(TPCNsigma[i]->GetXaxis()->FindBin(0.)), 0, 1);
         elec->SetParLimits(1, -1,1);
+        TPCNsigma[i]->Fit(elec,"QN","",-0.5, 3);
         
+        TF1 *Kaon = new TF1("Kaon", "gausn(0)",-10,10);
         
-        TPCNsigma[i]->Fit(elec,"RN","",-0.5, 3);
-        
-        TF1 *TotalFit;
-        
-        if (fpTBins.At(i) > 1.4)
-        {
-            TotalFit = new TF1("Total", "gaus(0) + gaus(3) + exp([6]*x)*landau(7)",-12,8); //Elec + proton/Kaon + pion
-            TotalFit->SetParameters(TPCNsigma[i]->GetBinContent(TPCNsigma[i]->GetXaxis()->FindBin(0.)), 0, 1, protonkaon->GetParameter(0), protonkaon->GetParameter(1), protonkaon->GetParameter(2), pion->GetParameter(0), pion->GetParameter(1), pion->GetParameter(2), pion->GetParameter(3) );
-            //elec parm limi
-            TotalFit->SetParLimits(1, -0.2,0.2);
-            TotalFit->SetParLimits(2, 0.8, 1.2);
-            
-            //kaon/proton limits
-            if (fpTBins.At(i) > 3.9)
-                TotalFit->SetParLimits(4, -10, -6);
-            else
-                TotalFit->SetParLimits(4, -10, -4);
-            
-            //pion limits
-            
-            //TotalFit->SetParLimits(9, -9, -1);
-            
-        }
+        if ( (fpTBins.At(i) >= MinimumValueToUseRightSideFit) && (fpTBins.At(i) < MaximumValueToUseRightSideFit) )
+            Kaon->SetParameters(TPCNsigma[i]->GetBinContent(TPCNsigma[i]->GetXaxis()->FindBin(7.)), 7, 2);
         else
+            Kaon->FixParameter(0,0);
+        
+        TPCNsigma[i]->Fit(Kaon,"QN","",5.5, 10);
+        
+        
+        TF1 *TotalFit = new TF1("Total Fit", "gausn(0)+gausn(3)+gausn(6) +gaus(9)",PionFitMin,10); //Elec + pion (2 gaus) + [kaon (1 gaus) -- only until 2 GeV/c
+        
+        Double_t Parameters[12] = {elec->GetParameter(0), elec->GetParameter(1), elec->GetParameter(2), pion->GetParameter(0), pion->GetParameter(1), pion->GetParameter(2), pion->GetParameter(3), pion->GetParameter(4), pion->GetParameter(5), Kaon->GetParameter(0), Kaon->GetParameter(1), Kaon->GetParameter(2)};
+        
+        TotalFit->SetParameters(Parameters);
+        Double_t TotalFitMax = 10;
+        
+        TotalFit->SetParLimits(1,-1,1);
+        TotalFit->SetParLimits(2,0.5,1.5);
+        
+        TotalFit->SetParLimits(10,0,10);
+        TotalFit->SetParLimits(11,0,10);
+        
+        if (! ((fpTBins.At(i) >= MinimumValueToUseRightSideFit) && (fpTBins.At(i) < MaximumValueToUseRightSideFit)) )
         {
-            TotalFit = new TF1("Total", "gaus(0) + exp([3]*x)*landau(4)",-10,3.5); //Elec + proton/Kaon + pion
-            TotalFit->SetParameters(TPCNsigma[i]->GetBinContent(TPCNsigma[i]->GetXaxis()->FindBin(0.)), 0, 1, pion->GetParameter(0), pion->GetParameter(1), pion->GetParameter(2), pion->GetParameter(3) );
-            TotalFit->SetParLimits(1, -0.2,0.2);
-            TotalFit->SetParLimits(2, 0.8, 1.2);
+            TotalFit->FixParameter(11,0);
+            TotalFit->FixParameter(10,0);
+            TotalFit->FixParameter(9,0);
+            TotalFitMax = 2.;
+        }
+        
+        
+        
+        if (i == 0 || i == 1)
+        {
+            TotalFit->FixParameter(11,Kaon->GetParameter(2));
+            TotalFit->FixParameter(10,Kaon->GetParameter(1));
+            TotalFit->FixParameter(9,Kaon->GetParameter(0));
+            
+        }
+        
+        if (fpTBins.At(i) == 4)
+        {
+            TotalFit->FixParameter(6,0);
+            TotalFit->FixParameter(7,0);
+            TotalFit->FixParameter(8,0);
             
         }
         
         
         
-        TPCNsigma[i]->Fit(TotalFit,"0R");
+        
+        TPCNsigma[i]->Fit(TotalFit,"LQI0","", PionFitMin, TotalFitMax);
+        
         elec->SetParameters(TotalFit->GetParameter(0), TotalFit->GetParameter(1), TotalFit->GetParameter(2));
         
-        if (fpTBins.At(i) > 1.4)
-        {
-            protonkaon->SetParameters(TotalFit->GetParameter(3), TotalFit->GetParameter(4), TotalFit->GetParameter(5));
-            pion->SetParameters(TotalFit->GetParameter(6), TotalFit->GetParameter(7), TotalFit->GetParameter(8), TotalFit->GetParameter(9));
-        }
-        else
-        {
-            pion->SetParameters(TotalFit->GetParameter(3), TotalFit->GetParameter(4), TotalFit->GetParameter(5), TotalFit->GetParameter(6));
-        }
+        pion->SetParameters(TotalFit->GetParameter(3), TotalFit->GetParameter(4), TotalFit->GetParameter(5),TotalFit->GetParameter(6), TotalFit->GetParameter(7), TotalFit->GetParameter(8));
         
-        
+        Kaon->SetParameters(TotalFit->GetParameter(9), TotalFit->GetParameter(10), TotalFit->GetParameter(11));
         
         if(DrawG)
         {
             TCanvas *HadronContamination = new TCanvas(Form("HadronContamination%d",i),Form("HadronContamination%d",i), 900,600 );
             HadronContamination->SetLogy();
+            HadronContamination->SetGridx();
+            HadronContamination->SetGridy();
+            
             TPCNsigma[i]->Draw();
             TPCNsigma[i]->SetLineColor(1);
             TPCNsigma[i]->SetMarkerColor(1);
-            TPCNsigma[i]->SetMarkerSize(1);
-            TPCNsigma[i]->SetMarkerStyle(20);
-
-            if (fpTBins.At(i) > 1.4)
-            {
-                protonkaon->SetLineColor(kBlue);
-                protonkaon->Draw("same");
-                pion->SetLineColor(kMagenta);
-                pion->Draw("same");
-            }
-            else
-            {
-                pion->SetLineColor(kMagenta);
-                pion->Draw("same");
-                
-            }
+            TPCNsigma[i]->SetMarkerSize(0.5);
+            TPCNsigma[i]->SetMarkerStyle(kFullCircle);
+            
+            TotalFit->SetLineColor(kRed);
+            TotalFit->Draw("same");
+            
+            TH1F* Ratio = (TH1F*) TPCNsigma[i]->Clone("Data/Fit");
+            Ratio->SetMarkerColor(kAzure);
+            Ratio->SetLineColor(kAzure);
+            Ratio->Divide(TotalFit);
+            Ratio->Draw("same");
+            
+            Ratio->GetXaxis()->SetRangeUser(PionFitMin,TotalFitMax);
+            pion->SetLineColor(kMagenta);
+            pion->Draw("same");
+            pion->SetLineStyle(2);
             
             elec->Draw("same");
-            
+            elec->SetLineStyle(2);
             elec->SetLineColor(kGreen);
+            
+            Kaon->SetLineStyle(2);
+            Kaon->SetLineColor(kBlue);
+            if (((fpTBins.At(i) >= MinimumValueToUseRightSideFit) && (fpTBins.At(i) < MaximumValueToUseRightSideFit)))
+                Kaon->Draw("same");
             TLegend leg(0.65,0.67,0.88,0.88);
             leg.AddEntry(TPCNsigma[i],"Data", "lp");
-
-            if (fpTBins.At(i) > 1.4)
-                leg.AddEntry(protonkaon,"Protons/Kaons", "l");
+            
+            
             leg.SetHeader(fLegendTitle.Data());
             leg.AddEntry(pion,"Pions", "l");
             leg.AddEntry(elec,"Electrons", "l");
-            //leg.AddEntry((TObject*)0,Form("#chi^2/NDF = %1.2f", TotalFit->GetChisquare()), "l");
+            leg.AddEntry(TotalFit, "Total Fit", "l");
+            leg.AddEntry(Ratio, "Data/Fit", "lp");
+            if (((fpTBins.At(i) >= MinimumValueToUseRightSideFit) && (fpTBins.At(i) < MaximumValueToUseRightSideFit)))
+                leg.AddEntry(Kaon, "Kaon", "l");
+            //leg.AddEntry((TObject*)0,Form("#chi^{2}/NDF = %1.2f", TotalFit->GetChisquare()/TotalFit->GetNDF()), "l");
             leg.Draw("same");
             //HadronContamination->BuildLegend();
             
@@ -811,19 +826,42 @@ Bool_t AliHFehpPbTool::CalculateHadronContamination()
             
         }
         
-        Double_t ElectronIntegral = elec->Integral(-1.0,3.0);
-        Double_t PionIntegral = pion->Integral(-1.0,3.0);
-        //Double_t ProtonkaonIntegral= protonkaon->Integral(-0.5,3.0);
         
-        Double_t Contamination = (PionIntegral)/(PionIntegral+ElectronIntegral);
+        
+        Float_t LowerCut[7] = {-1};
+        Float_t UpperCut = 3;
+        Double_t ContaminationInSample = 0;
+        
+        for (Int_t iLowCut = 0; iLowCut < 1; iLowCut++)
+        {
+            Double_t ElectronIntegral = elec->Integral(LowerCut[iLowCut],UpperCut);
+            Double_t PionIntegral = pion->Integral(LowerCut[iLowCut],UpperCut);
+            Double_t KaonIntegral= Kaon->Integral(LowerCut[iLowCut],UpperCut);
+            
+            //KaonIntegral = 0;
+            Double_t Contamination = (PionIntegral+ KaonIntegral)/(PionIntegral + ElectronIntegral + KaonIntegral);
+            Double_t ErrorPionKaon = TMath::Sqrt(PionIntegral + KaonIntegral);
+            Double_t DemError = TMath::Sqrt(PionIntegral + KaonIntegral + ElectronIntegral);
+            Double_t ContaminationError = Contamination * TMath::Sqrt(pow(ErrorPionKaon/(PionIntegral + KaonIntegral),2) + pow(DemError/(PionIntegral + KaonIntegral+ElectronIntegral),2));
+            ContaminationInSample = Contamination;
+            
+            ContamiantionUsingCuts[iLowCut]->SetBinContent(i+1, Contamination);
+            ContamiantionUsingCuts[iLowCut]->SetBinError(i+1, ContaminationError);
+            
+            /// if (iLowCut == -0.5)
+            
+        }
+        
+        //calculate error associated, for now assume that
+        
         
         //REMOVE THIS FOR PRODUCTION
-        fHadronContamination->SetBinContent(i+1,1-Contamination);
-        fHadronContamination->SetBinError(i+1,(1-Contamination)/100000000000000000000.);
+        fHadronContamination->SetBinContent(i+1,1-ContaminationInSample);
+        
         
         //fHadronContamination->SetBinContent(i+1,1);
-        //fHadronContamination->SetBinError(i+1,(1)/100000000000000000000.);
-
+        fHadronContamination->SetBinError(i+1,(1)/100000000000000000000.);
+        
         
         fTPCNSigmaCenter->SetBinContent(i+1, TotalFit->GetParameter(1));
         fTPCNSigmaCenter->SetBinError(i+1, TotalFit->GetParError(1));
@@ -831,11 +869,42 @@ Bool_t AliHFehpPbTool::CalculateHadronContamination()
         fTPCNSigmaSTD->SetBinContent(i+1, TotalFit->GetParameter(2));
         fTPCNSigmaSTD->SetBinError(i+1, TotalFit->GetParError(2));
         
-                                              
-        //Double_t BinCounting = TPCNsigma[i]->Integrate(-0.5,3.0);
-        printf("Bin: %d, Elec: %1.3f Pion = %1.3f; Total = %1.3f;Cont: = %1.3f \n", i+1, ElectronIntegral, PionIntegral, ElectronIntegral+PionIntegral, Contamination);
         
+        /*
+         //Double_t BinCounting = TPCNsigma[i]->Integrate(-0.5,3.0);
+         printf("Bin: %d, Elec: %1.3f Pion = %1.3f; Total = %1.3f;Cont: = %1.3f \n", i+1, ElectronIntegral, PionIntegral, ElectronIntegral+PionIntegral, Contamination);
+         */
     }
+    
+    ContaminationPlots->cd();
+    Int_t iLowCut = 0;
+    
+    ContamiantionUsingCuts[iLowCut]->SetMarkerColor(kRed);
+    ContamiantionUsingCuts[iLowCut]->GetYaxis()->SetRangeUser(10E-3,10);
+    ContamiantionUsingCuts[iLowCut]->SetLineColor(kRed);
+    ContamiantionUsingCuts[iLowCut]->SetMarkerSize(0.5);
+    ContamiantionUsingCuts[iLowCut]->SetMarkerStyle(kFullCircle);
+    ContamiantionUsingCuts[iLowCut]->Draw("same");
+    
+    
+    /*
+     Int_t Colors[7] = {TColor::GetColor("#e41a1c"), TColor::GetColor("#377eb8"), TColor::GetColor("#4daf4a"), TColor::GetColor("#984ea3"), TColor::GetColor("#ff7f00"), TColor::GetColor("#ffff33"), TColor::GetColor("#a65628")};
+     Float_t LowerCut[7] = {-3,-2.5,-2,-1.5,-1.0,-0.5,0.};
+     
+     for (Int_t iLowCut = 0; iLowCut < 7; iLowCut++) {
+     ContamiantionUsingCuts[iLowCut]->SetMarkerColor(Colors[iLowCut]);
+     ContamiantionUsingCuts[iLowCut]->GetYaxis()->SetRangeUser(10E-3,10);
+     ContamiantionUsingCuts[iLowCut]->SetLineColor(Colors[iLowCut]);
+     ContamiantionUsingCuts[iLowCut]->SetTitle(Form("%1.1f < n#sigma TPC < 3.0 ",LowerCut[iLowCut]));
+     ContamiantionUsingCuts[iLowCut]->SetMarkerSize(0.5);
+     ContamiantionUsingCuts[iLowCut]->SetMarkerStyle(kFullCircle);
+     ContamiantionUsingCuts[iLowCut]->Draw("same");
+     }
+     
+     
+     ContaminationPlots->SetLogy();
+     ContaminationPlots->BuildLegend(0.6748166,0.1442308,0.8777506,0.5048077);
+     */
     
     //HadronContamination->cd(fpTBins.GetSize());
     fHadronContamination->GetXaxis()->SetTitle("p_{T} (GeV/c)");
@@ -890,7 +959,7 @@ void AliHFehpPbTool::Print2DCorrelation()
         FormatTH2Titles(fHFEhSame[i]);
         fHFEhSame[i]->GetZaxis()->SetTitle("N_{eh}^{same}");
         fHFEhSame[i]->GetXaxis()->SetTitle("#Delta#varphi(rad)");
-
+        
         fHFEhSame[i]->Draw("surf1");
         print2Dplot.cd(2);
         FormatTH2Titles(fHFEhMixed[i]);
@@ -915,8 +984,8 @@ void AliHFehpPbTool::Print2DCorrelation()
         fHFEhNormalized[i]->GetZaxis()->SetTitle("N_{eh}/N_{e}");
         merged->Print(Form("Hfe_merged_%d_%d_%d.pdf",fConfigIndex,fCentralityIndex,i));
     }
-
-       //fHFEhNormalized[pT]; //
+    
+    //fHFEhNormalized[pT]; //
 }
 
 void AliHFehpPbTool::FormatTH2Titles(TH2F* histo)
@@ -1031,7 +1100,54 @@ Bool_t AliHFehpPbTool::CalculateTaggingEfficiencyWToData()
     printf("========================\n");
     printf("Finished Eff using W to Data \n");
     printf("========================\n");
+    
+    
+    return kFALSE;
+    
+    
+    
+}
 
+
+Bool_t AliHFehpPbTool::CalculateTaggingEfficiencyWToDataNoEnh()
+{
+    
+    printf("========================\n");
+    printf("Eff using W to Data \n");
+    printf("========================\n");
+    
+    if (!fInputList)
+        printf("No input list");
+    else
+        ("list ok");
+    
+    TH1F* ULS = (TH1F*) fInputList->FindObject("fElectronBKGNoEnhULS_WithW");
+    TH1F* LS = (TH1F*) fInputList->FindObject("fElectronBKGNoEnhLS_WithW");
+    TH1F *Total = (TH1F*) fInputList->FindObject("fElectronBKGNoEnhTotalNumber_WithW");
+    
+    if (!ULS || !LS || !Total)
+        printf("Error reading histograms for efficiency calculation\n");
+    else
+        printf("reading ok");
+    
+    
+    ULS->Add(LS,-1);
+    
+    ULS = (TH1F*) ULS->Rebin(fpTBins.GetSize()-1, "BackgroundForTaggingEff", fpTBins.GetArray());
+    Total = (TH1F*) Total->Rebin(fpTBins.GetSize()-1, "TotalBackgroundForTaggingEff", fpTBins.GetArray());
+    
+    ULS->Divide(ULS,Total,1,1,"B");
+    
+    fEffTagging = (TH1F*) ULS->Clone("fEffTagging");
+    
+    if (fEffTagging)
+        return kTRUE;
+    
+    
+    printf("========================\n");
+    printf("Finished Eff using W to Data \n");
+    printf("========================\n");
+    
     
     return kFALSE;
     
@@ -1096,13 +1212,13 @@ void AliHFehpPbTool::CalculateFlow1D(AliHFehpPbTool* Reference, Bool_t FitConsta
             FlowFunction[i]->SetParameters(10.,0.05, 0.1);
             //FlowFunction[i]->FixParameter(1,0);
         }
-
+        
         JetReference[i] = Reference->GetHFeh1DSub(i);
-
+        
         fFlowHistograms[i] = (TH1F*) fHFEhNormalized1D[i]->Clone(Form("FlowHistograms%d",i));
         fFlowHistograms[i]->Add(JetReference[i],-1);
         fFlowHistograms[i]->Fit(FlowFunction[i],"0");
-
+        
         
     }
     
@@ -1288,17 +1404,17 @@ Bool_t AliHFehpPbTool::CalculateYield(Bool_t Flow)
         FitYield[pT] = new TF1 (Form("FitYield%d",pT), "[0]/TMath::Sqrt(2.*TMath::Pi())/[2]*TMath::Exp(-(x-[1])*(x-[1])/2./([2]*[2])) + [3]/TMath::Sqrt(2.*TMath::Pi())/[5]*TMath::Exp(-(x-[4])*(x-[4])/2./([5]*[5])) +[6] ",-0.5*TMath::Pi(),1.5*TMath::Pi());
         
         FitYield[pT]->SetParameters(2., 0. , 0.7 , 1., TMath::Pi(), 0.7, fHFEhNormalized1D[pT]->GetBinContent(fHFEhNormalized1D[pT]->GetNbinsX()/2));
-       // if (Flow)
+        // if (Flow)
         //{
-          //  TF1 *FlowFunction = fFlowHistograms[pT]->GetFunction(Form("fit%d",pT));
-            //FitYield[pT]->FixParameter(0, FlowFunction->GetParameter(0));
-           // FitYield[pT]->FixParameter(1, FlowFunction->GetParameter(1));
+        //  TF1 *FlowFunction = fFlowHistograms[pT]->GetFunction(Form("fit%d",pT));
+        //FitYield[pT]->FixParameter(0, FlowFunction->GetParameter(0));
+        // FitYield[pT]->FixParameter(1, FlowFunction->GetParameter(1));
         //}
         //else
         //{
-            //FitYield[pT]->FixParameter(0, Pedestal);
-            //FitYield[pT]->FixParameter(1, 0);
-       // }
+        //FitYield[pT]->FixParameter(0, Pedestal);
+        //FitYield[pT]->FixParameter(1, 0);
+        // }
         
         FitYield[pT]->FixParameter(1, 0); //Near side peak
         FitYield[pT]->FixParameter(4, TMath::Pi()); // Away side peak
@@ -1306,14 +1422,14 @@ Bool_t AliHFehpPbTool::CalculateYield(Bool_t Flow)
         
         FitYield[pT]->SetParLimits(5, 0.5,3);
         FitYield[pT]->SetParLimits(2, 0.3,3);
-
+        
         
         //fHFEhNormSub1D[pT]->Fit(FitYield[pT]);
         fHFEhNormalized1D[pT]->Fit(FitYield[pT], "0+");
         
         double yieldNS = FitYield[pT]->GetParameter(0);
         double errorNS = FitYield[pT]->GetParError(0);
-
+        
         double yieldAS =  FitYield[pT]->GetParameter(3);
         double errorAS =FitYield[pT]->GetParError(3);
         
@@ -1397,12 +1513,12 @@ Bool_t AliHFehpPbTool::CalculateV22PC()
                 }
                 fHFehProjectionForV2NonSub[pT]->SetBinContent(ix, Mean/Normalization);
                 fHFehProjectionForV2NonSub[pT]->SetBinError(ix, TMath::Sqrt(1./Normalization));
-
-
+                
+                
             }
-
-        
-           
+            
+            
+            
             
         }
         
@@ -1473,7 +1589,7 @@ void AliHFehpPbTool::CalculateMCWeight()
     EtaHijing->SetLineColor(kBlack);
     EtaHijing->GetYaxis()->SetRangeUser(0.01,10E9);
     EtaHijing->DrawCopy();
-
+    
     EtaEnh->SetLineColor(kRed);
     EtaEnh->SetMarkerStyle(kOpenCircle);
     EtaEnh->SetMarkerColor(kRed);
@@ -1510,7 +1626,7 @@ void AliHFehpPbTool::CompareMCMotherDistributions(TString FilemTScalling)
     
     TH1F* EtaHijing = (TH1F*) fInputList->FindObject("fPtMCEta_PureHijing");
     TH1F* EtaEnh = (TH1F*) fInputList->FindObject("fPtMCEta_NoMother");
-
+    
     
     TH1F* RatioPurHijingPion = (TH1F*) PionHijing->Clone("RatioPurHijingPion");
     TH1F* RatioPurHijingEta = (TH1F*) EtaHijing->Clone("RatioPurHijingEta");
@@ -1560,7 +1676,7 @@ void AliHFehpPbTool::CompareMCMotherDistributions(TString FilemTScalling)
         
         EtaHijing->SetBinContent(i,EtaHijing->GetBinContent(i)/EtaHijing->GetBinCenter(i));
         EtaHijing->SetBinError(i,EtaHijing->GetBinError(i)/EtaHijing->GetBinCenter(i));
-
+        
     }
     
     TCanvas *Weight = new TCanvas("Fit", "Fit", 400,300);
@@ -1584,12 +1700,13 @@ void AliHFehpPbTool::CompareMCMotherDistributions(TString FilemTScalling)
     EtaHijing->Write("Eta");
     ExportInverseW->Clone();
     
-
+    
 }
 
 
 void AliHFehpPbTool::CalculateWToData()
 {
+    Double_t Nevents = GetNEvents();
     
     TF1 *HagFunctionPi0 = new TF1("levy","1.245*((7.331-1.)*(7.331-2.))/(7.331*0.1718*(7.331*0.1718+0.135*(7.331-2.)))*pow(1.+(sqrt(0.135*0.135+x*x)-0.135)/(7.331*0.1718),-7.331)",0,50);//p-Pb pi0 AllCent
     
@@ -1638,20 +1755,24 @@ void AliHFehpPbTool::CalculateWToData()
     
     RatiosToMtScale->SaveAs("RatioHijinToWeight.pdf");
     
-    PionHijing->Add(PionEnh);
-    EtaHijing->Add(EtaEnh);
+    //PionHijing->Add(PionEnh);
+    //EtaHijing->Add(EtaEnh);
     
     //PionHijing->Scale(1./PionHijing->GetEntries());
     PionHijing->Scale(1.,"width");
     
     for (Int_t i = 1; i <= PionHijing->GetNbinsX(); i++)
     {
-        PionHijing->SetBinContent(i,PionHijing->GetBinContent(i)/PionHijing->GetBinCenter(i));
-        PionHijing->SetBinError(i,PionHijing->GetBinError(i)/PionHijing->GetBinCenter(i));
         
-        EtaHijing->SetBinContent(i,EtaHijing->GetBinContent(i)/EtaHijing->GetBinCenter(i));
-        EtaHijing->SetBinError(i,EtaHijing->GetBinError(i)/EtaHijing->GetBinCenter(i));
+        //Double_t PionIntegral = HagFunctionPi0->Integral(PionHijing->GetBinLowEdge(i), PionHijing->GetBinLowEdge(i)+ PionHijing->GetBinWidth(i));
+        //Double_t EtaIntegral = HagFunctionEta->Integral(EtaHijing->GetBinLowEdge(i), EtaHijing->GetBinLowEdge(i)+ EtaHijing->GetBinWidth(i));
         
+        
+        Double_t PionIntegral = 1.;
+        Double_t EtaIntegral = 1.;
+        
+        PionHijing->SetBinContent(i,PionHijing->GetBinContent(i)/(PionHijing->GetBinCenter(i)*PionIntegral));
+        EtaHijing->SetBinContent(i,EtaHijing->GetBinContent(i)/(EtaHijing->GetBinCenter(i)*EtaIntegral));
     }
     
     TCanvas *Weight = new TCanvas("Fit", "Fit", 400,300);
@@ -1671,19 +1792,24 @@ void AliHFehpPbTool::CalculateWToData()
     EtaHijing->GetSumw2()->Set(0);
     
     
-    for (Int_t i = 1; i <= PionHijing->GetNbinsX(); i++)
-    {
-       PionHijing->SetBinContent(i, 1./PionHijing->GetBinContent(i));
-       EtaHijing->SetBinContent(i,1./EtaHijing->GetBinContent(i));
-        
-    }
+    /*
+     for (Int_t i = 1; i <= PionHijing->GetNbinsX(); i++)
+     {
+     PionHijing->SetBinContent(i, 1./PionHijing->GetBinContent(i));
+     EtaHijing->SetBinContent(i,1./EtaHijing->GetBinContent(i));
+     
+     }
+     */
+    
+    PionHijing->Scale(1./Nevents);
+    EtaHijing->Scale(1./Nevents);
     
     PionHijing->Draw();
     EtaHijing->Draw("same");
     
     Weight->BuildLegend();
     
-    TFile *ExportInverseW = new TFile("BackgroundWtoData2.root", "RECREATE");
+    TFile *ExportInverseW = new TFile("BackgroundWtoDataNoIntegral.root", "RECREATE");
     PionHijing->Write("Pi0");
     EtaHijing->Write("Eta");
     ExportInverseW->Clone();
@@ -1691,24 +1817,186 @@ void AliHFehpPbTool::CalculateWToData()
     
 }
 
-void AliHFehpPbTool::CalculateWToDataPrelimiray()
+void AliHFehpPbTool::CalculateWToDataNoEnh()
 {
+    Double_t bins[83] = {0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 3.0, 3.1, 3.2, 3.3,3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 4.0, 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8, 4.9, 5, 5.2, 5.4, 5.6, 5.8, 6.0, 6.2, 6.4, 6.6, 6.8, 7.0, 7.2, 7.4, 7.6, 7.8, 8.0, 8.5, 9.0, 9.5, 10.0, 11, 12, 13, 14, 15, 16,18,20,100};
+    Int_t Nbins = 82-4;
+    
+    //Double_t bins[59] = {0.100,0.120,0.140,0.160,0.180,0.200,0.250,0.300,0.350,0.400,0.450,0.500,0.550,0.600,0.650,0.700,0.750,0.800,0.850,0.900,0.950,1.000,1.100,1.200,1.300,1.400,1.500,1.600,1.700,1.800,1.900,2.000,2.200,2.400,2.600,2.800,3.000,3.200,3.400,3.600,3.800,4.000,4.500,5.000,5.500,6.000,6.500,7.000,8.000,9.000,10.000,11.000,12.000,13.000,14.000,15.000,16.000,18.000,20.00};
+    // Int_t Nbins = 58;
+    
+    //Double_t bins[45] =  {0.1,0.112797,0.127231,0.143512,0.161877,0.182592,0.205957,0.232313,0.262041,0.295573,0.333397,0.37606,0.424183,0.478465,0.539692,0.608754,0.686654,0.774523,0.873636,0.985432,1.11153,1.25377,1.41421,1.59519,1.79932,2.02957,2.28928,2.58223,2.91267,3.2854,3.70582,4.18004,4.71494,5.3183,5.99886,6.76651,7.6324,8.60909,9.71076,10.9534,12.3551,13.9361,15.7195,17.731,20};
+    
+    //Int_t Nbins = 44;
+    
     Double_t Nevents = GetNEvents();
+    
+    TF1 *HagFunctionPi0 = new TF1("levy","0.5*1.245*((7.331-1.)*(7.331-2.))/(7.331*0.1718*(7.331*0.1718+0.135*(7.331-2.)))*pow(1.+(sqrt(0.135*0.135+x*x)-0.135)/(7.331*0.1718),-7.331)",0,100);//p-Pb pi0 AllCent
+    
+    TF1 *HagFunctionEta =new TF1("levy1","0.48*((((7.331-1.)*(7.331-2.))/(7.331*0.1718*(7.331*0.1718+0.13498*(7.331-2.)))*pow(1.+(sqrt(0.13498*0.13498+25)-0.13498)/(7.331*0.1718),-7.331)) / (((7.331-1.)*(7.331-2.))/(7.331*0.1718*(7.331*0.1718+0.13498*(7.331-2.)))*pow(1.+(sqrt(0.54751*0.54751+25)-0.13498)/(7.331*0.1718),-7.331)))*(x/sqrt(x*x + 0.54751*0.54751 - 0.13498*0.13498))*1.245*((7.331-1.)*(7.331-2.))/(7.331*0.1718*(7.331*0.1718+0.13498*(7.331-2.)))*pow(1.+(sqrt(0.54751*0.54751+x*x)-0.13498)/(7.331*0.1718),-7.331)",0,100);
+    
+    
+    
+    TH1F *temp = (TH1F*) fInputList->FindObject("fPtMCpi0_NoMother");
+    TH1F* PionEnh = (TH1F*) temp->Rebin(Nbins,"PionEnh",bins);
+    PionEnh->SetTitle("#pi^{0} from enhanced (with no mother);p_{T} (GeV/c);Counts/bin size ");
+    temp = (TH1F*) fInputList->FindObject("fPtMCEta_NoMother");
+    TH1F *EtaEnh = (TH1F*) temp->Rebin(Nbins,"EtaEnh",bins);
+    EtaEnh->SetTitle("#eta from enhanced (with no mother);p_{T} (GeV/c);Counts/bin size ");
+    
+    temp = (TH1F*) fInputList->FindObject("fPtMCpi0_PureHijing");
+    TH1F* PionHijing = (TH1F*) temp->Rebin(Nbins,"PionHijing",bins);
+    PionHijing->SetTitle("#pi from non-enhanced;p_{T} (GeV/c);Counts/bin size ");
+    
+    temp = (TH1F*) fInputList->FindObject("fPtMCEta_PureHijing");
+    TH1F *EtaHijing = (TH1F*) temp->Rebin(Nbins,"EtaHijing",bins);
+    EtaHijing->SetTitle("#eta from non-enhanced;p_{T} (GeV/c);Counts/bin size ");
+    
+    
+    
+    TH1F* RatioPurHijingPion = (TH1F*) PionHijing->Clone("RatioPurHijingPion");
+    TH1F* RatioPurHijingEta = (TH1F*) EtaHijing->Clone("RatioPurHijingEta");
+    
+    for (Int_t i = 1; i <= RatioPurHijingPion->GetNbinsX(); i++)
+    {
+        RatioPurHijingPion->SetBinContent(i,RatioPurHijingPion->GetBinContent(i)/RatioPurHijingPion->GetBinCenter(i));
+        RatioPurHijingPion->SetBinError(i,RatioPurHijingPion->GetBinError(i)/RatioPurHijingPion->GetBinCenter(i));
+        
+        RatioPurHijingEta->SetBinContent(i,RatioPurHijingEta->GetBinContent(i)/RatioPurHijingEta->GetBinCenter(i));
+        RatioPurHijingEta->SetBinError(i,RatioPurHijingEta->GetBinError(i)/RatioPurHijingEta->GetBinCenter(i));
+    }
+    
+    RatioPurHijingPion->Scale(1.,"width");
+    RatioPurHijingPion->Divide(HagFunctionPi0);
+    
+    RatioPurHijingEta->Scale(1.,"width");
+    RatioPurHijingEta->SetLineColor(kRed);
+    RatioPurHijingEta->SetMarkerColor(kRed);
+    RatioPurHijingEta->Divide(HagFunctionEta);
+    
+    TCanvas *RatiosToMtScale = new TCanvas("Ratio","Ratio",400,300);
+    RatiosToMtScale->SetLogy();
+    
+    RatioPurHijingPion->GetXaxis()->SetRangeUser(0,20);
+    RatioPurHijingEta->GetXaxis()->SetRangeUser(0,20);
+    RatioPurHijingPion->Draw("same");
+    RatioPurHijingPion->GetYaxis()->SetTitle("Ratio Hijing/m_{T} scaled data");
+    RatioPurHijingPion->SetTitle("#pi^{0}");
+    RatioPurHijingEta->SetTitle("#eta");
+    RatioPurHijingEta->Draw("same");
+    
+    RatiosToMtScale->BuildLegend();
+    
+    RatiosToMtScale->SaveAs("RatioHijinToWeight.pdf");
+    
+    PionHijing->Scale(1./Nevents);
+    EtaHijing->Scale(1./Nevents);
+    
+    PionHijing->Scale(1.,"width");
+    EtaHijing->Scale(1.,"width");
+    
+    PionHijing->Scale(1./(2*TMath::Pi()));
+    EtaHijing->Scale(1./(2*TMath::Pi()));
+    
+    PionHijing->Scale(1./2.4);
+    EtaHijing->Scale(1./2.4);
+    
+    for (Int_t i = 1; i <= PionHijing->GetNbinsX(); i++)
+    {
+        PionHijing->SetBinContent(i,PionHijing->GetBinContent(i)/PionHijing->GetBinCenter(i));
+        PionHijing->SetBinError(i,PionHijing->GetBinError(i)/PionHijing->GetBinCenter(i));
+        
+        EtaHijing->SetBinContent(i,EtaHijing->GetBinContent(i)/EtaHijing->GetBinCenter(i));
+        EtaHijing->SetBinError(i,EtaHijing->GetBinError(i)/EtaHijing->GetBinCenter(i));
+        
+    }
+    
+    PionHijing->SaveAs("Pionspectra.root");
+    EtaHijing->SaveAs("EtaSpectra.root");
+    
+    TCanvas *Weight = new TCanvas("Fit", "Fit", 400,300);
+    Weight->SetLogy();
+    PionHijing->Divide(HagFunctionPi0);
+    PionHijing->SetTitle("#pi ;p_{T} GeV/c;MC/Data");
+    PionHijing->GetXaxis()->SetRangeUser(0,50);
+    
+    
+    EtaHijing->Divide(HagFunctionEta);
+    EtaHijing->SetTitle("#eta;p_{T} GeV/c;MC/Data");
+    EtaHijing->GetXaxis()->SetRangeUser(0,50);
+    EtaHijing->SetLineColor(kRed);
+    EtaHijing->SetMarkerColor(kRed);
+    
+    PionHijing->GetSumw2()->Set(0);
+    EtaHijing->GetSumw2()->Set(0);
+    
+    
+    
+    
+    for (Int_t i = 1; i <= PionHijing->GetNbinsX(); i++)
+    {
+        PionHijing->SetBinContent(i, 1./PionHijing->GetBinContent(i));
+        EtaHijing->SetBinContent(i,1./EtaHijing->GetBinContent(i));
+        
+    }
+    
+    
+    
+    PionHijing->Draw();
+    EtaHijing->Draw("same");
+    
+    Weight->BuildLegend();
+    
+    TFile *ExportInverseW = new TFile("BackgroundWtoData_Inverse_Fit.root", "RECREATE");
+    PionHijing->Write("Pi0");
+    EtaHijing->Write("Eta");
+    ExportInverseW->Clone();
+    
+    
+    
+}
+
+void AliHFehpPbTool::CalculateWToDataUseEnh()
+{
+    Double_t bins[111] = {0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 3.0, 3.1, 3.2, 3.3,3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 4.0, 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8, 4.9, 5, 5.2, 5.4, 5.6, 5.8, 6.0, 6.2, 6.4, 6.6, 6.8, 7.0, 7.2, 7.4, 7.6, 7.8, 8.0, 8.5, 9.0, 9.5, 10.0, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50,100};
+    
+    Int_t Nbins = 110;
+    
+    Double_t Nevents = GetNEvents();
+    
     //[0]  = A, [1] = nTsallis, [2] = T, [3] = mass
     
-    TF1 *HagFunctionPi0 = new TF1("pi0", "[0]/2*TMath::Pi() * (([1]-1)*([1]-2))/([1]*[2]*([1]*[2]+[3]*([1]-2))) * pow ((1 + (TMath::Sqrt(x*x + [3]*[3])- [3])/([1]*[2])),-[1])" ,0,50);//p-Pb pi0 AllCent
+    /*
+     TF1 *HagFunctionPi0 = new TF1("pi0", "[0]/2*TMath::Pi() * (([1]-1)*([1]-2))/([1]*[2]*([1]*[2]+[3]*([1]-2))) * pow ((1 + (TMath::Sqrt(x*x + [3]*[3])- [3])/([1]*[2])),-[1])" ,0,50);//p-Pb pi0 AllCent
+     
+     HagFunctionPi0->SetParameters(8.15719, 7.19545, 0.168252, 134.9766/1000.);
+     
+     TF1 *HagFunctionEta = new TF1("eta", "[0]/2*TMath::Pi() * (([1]-1)*([1]-2))/([1]*[2]*([1]*[2]+[3]*([1]-2))) * pow ((1 + (TMath::Sqrt(x*x + [3]*[3])- [3])/([1]*[2])),-[1])" ,0,50);
+     
+     HagFunctionEta->SetParameters(0.909368, 7.50074, 0.269817, 547.862/1000.);
+     */
     
-    HagFunctionPi0->SetParameters(8.15719, 7.19545, 0.168252, 134.9766/1000.);
+    TF1 *HagFunctionPi0 = new TF1("levy","1.245*((7.331-1.)*(7.331-2.))/(7.331*0.1718*(7.331*0.1718+0.135*(7.331-2.)))*pow(1.+(sqrt(0.135*0.135+x*x)-0.135)/(7.331*0.1718),-7.331)",0,100);//p-Pb pi0 AllCent
     
-    TF1 *HagFunctionEta = new TF1("eta", "[0]/2*TMath::Pi() * (([1]-1)*([1]-2))/([1]*[2]*([1]*[2]+[3]*([1]-2))) * pow ((1 + (TMath::Sqrt(x*x + [3]*[3])- [3])/([1]*[2])),-[1])" ,0,50);
+    TF1 *HagFunctionEta =new TF1("levy1","0.48*((((7.331-1.)*(7.331-2.))/(7.331*0.1718*(7.331*0.1718+0.13498*(7.331-2.)))*pow(1.+(sqrt(0.13498*0.13498+25)-0.13498)/(7.331*0.1718),-7.331)) / (((7.331-1.)*(7.331-2.))/(7.331*0.1718*(7.331*0.1718+0.13498*(7.331-2.)))*pow(1.+(sqrt(0.54751*0.54751+25)-0.13498)/(7.331*0.1718),-7.331)))*(x/sqrt(x*x + 0.54751*0.54751 - 0.13498*0.13498))*1.245*((7.331-1.)*(7.331-2.))/(7.331*0.1718*(7.331*0.1718+0.13498*(7.331-2.)))*pow(1.+(sqrt(0.54751*0.54751+x*x)-0.13498)/(7.331*0.1718),-7.331)",0,100);
     
-    HagFunctionEta->SetParameters(0.909368, 7.50074, 0.269817, 547.862/1000.);
     
-    TH1F* PionHijing = (TH1F*) fInputList->FindObject("fPtMCpi0_PureHijing");
-    TH1F* PionEnh = (TH1F*) fInputList->FindObject("fPtMCpi0_NoMother");
     
-    TH1F* EtaHijing = (TH1F*) fInputList->FindObject("fPtMCEta_PureHijing");
-    TH1F* EtaEnh = (TH1F*) fInputList->FindObject("fPtMCEta_NoMother");
+    TH1F *temp = (TH1F*) fInputList->FindObject("fPtMCpi0_NoMother");
+    TH1F* PionEnh = (TH1F*) temp->Rebin(Nbins,"PionEnh",bins);
+    PionEnh->SetTitle("#pi^{0} from enhanced (with no mother);p_{T} (GeV/c);Counts/bin size ");
+    temp = (TH1F*) fInputList->FindObject("fPtMCEta_NoMother");
+    TH1F *EtaEnh = (TH1F*) temp->Rebin(Nbins,"EtaEnh",bins);
+    EtaEnh->SetTitle("#eta from enhanced (with no mother);p_{T} (GeV/c);Counts/bin size ");
+    
+    temp = (TH1F*) fInputList->FindObject("fPtMCpi0_PureHijing");
+    TH1F* PionHijing = (TH1F*) temp->Rebin(Nbins,"PionHijing",bins);
+    PionHijing->SetTitle("#pi from non-enhanced;p_{T} (GeV/c);Counts/bin size ");
+    
+    temp = (TH1F*) fInputList->FindObject("fPtMCEta_PureHijing");
+    TH1F *EtaHijing = (TH1F*) temp->Rebin(Nbins,"EtaHijing",bins);
+    EtaHijing->SetTitle("#eta from non-enhanced;p_{T} (GeV/c);Counts/bin size ");
+    
     
     
     TH1F* RatioPurHijingPion = (TH1F*) PionHijing->Clone("RatioPurHijingPion");
@@ -1755,6 +2043,12 @@ void AliHFehpPbTool::CalculateWToDataPrelimiray()
     PionHijing->Scale(1.,"width");
     EtaHijing->Scale(1.,"width");
     
+    PionHijing->Scale(1./(2*TMath::Pi()));
+    EtaHijing->Scale(1./(2*TMath::Pi()));
+    
+    PionHijing->Scale(1./1.6);
+    EtaHijing->Scale(1./1.6);
+    
     for (Int_t i = 1; i <= PionHijing->GetNbinsX(); i++)
     {
         PionHijing->SetBinContent(i,PionHijing->GetBinContent(i)/PionHijing->GetBinCenter(i));
@@ -1764,6 +2058,9 @@ void AliHFehpPbTool::CalculateWToDataPrelimiray()
         EtaHijing->SetBinError(i,EtaHijing->GetBinError(i)/EtaHijing->GetBinCenter(i));
         
     }
+    
+    PionHijing->SaveAs("Pionspectra.root");
+    EtaHijing->SaveAs("EtaSpectra.root");
     
     TCanvas *Weight = new TCanvas("Fit", "Fit", 400,300);
     Weight->SetLogy();
@@ -1782,6 +2079,245 @@ void AliHFehpPbTool::CalculateWToDataPrelimiray()
     EtaHijing->GetSumw2()->Set(0);
     
     
+    /*
+     for (Int_t i = 1; i <= PionHijing->GetNbinsX(); i++)
+     {
+     PionHijing->SetBinContent(i, 1./PionHijing->GetBinContent(i));
+     EtaHijing->SetBinContent(i,1./EtaHijing->GetBinContent(i));
+     
+     }
+     */
+    
+    PionHijing->Draw();
+    EtaHijing->Draw("same");
+    
+    Weight->BuildLegend();
+    
+    TFile *ExportInverseW = new TFile("BackgroundWtoData_Inverse.root", "RECREATE");
+    PionHijing->Write("Pi0");
+    EtaHijing->Write("Eta");
+    ExportInverseW->Clone();
+    
+    
+    
+}
+
+void AliHFehpPbTool::CalculateWToDataNoFit()
+{
+    Double_t bins[59] = {0.100,0.120,0.140,0.160,0.180,0.200,0.250,0.300,0.350,0.400,0.450,0.500,0.550,0.600,0.650,0.700,0.750,0.800,0.850,0.900,0.950,1.000,1.100,1.200,1.300,1.400,1.500,1.600,1.700,1.800,1.900,2.000,2.200,2.400,2.600,2.800,3.000,3.200,3.400,3.600,3.800,4.000,4.500,5.000,5.500,6.000,6.500,7.000,8.000,9.000,10.000,11.000,12.000,13.000,14.000,15.000,16.000,18.000,20.00};
+    
+    Double_t ybinsDATA[58] = {39.55, 34.89, 30.87, 27.06,23.6, 18.92, 13.96, 10.47, 7.994, 6.194, 4.852, 3.837, 3.081, 2.513, 2.053, 1.701, 1.406, 1.172, 0.9803, 0.8255, 0.6971, 0.5445, 0.3991, 0.2944, 0.2208, 0.1662, 0.1271, 0.09805, 0.07637, 0.05982, 0.04697, 0.03344, 0.02158, 0.01417, 0.009503, 0.006552, 0.004579, 0.003216, 0.002324, 0.001701, 0.00124, 0.000756, 0.0003868, 0.0002116, 0.0001213, 7.17E-05, 4.44E-05, 2.36E-05, 1.10E-05, 5.45E-06, 2.91E-06, 1.64E-06, 9.96E-07, 6.40E-07, 3.99E-07, 2.63E-07, 1.51E-07, 7.32E-08};
+    
+    Int_t Nbins = 58;
+    
+    Double_t Nevents = GetNEvents();
+    
+    //[0]  = A, [1] = nTsallis, [2] = T, [3] = mass
+    
+    /*
+     TF1 *HagFunctionPi0 = new TF1("pi0", "[0]/2*TMath::Pi() * (([1]-1)*([1]-2))/([1]*[2]*([1]*[2]+[3]*([1]-2))) * pow ((1 + (TMath::Sqrt(x*x + [3]*[3])- [3])/([1]*[2])),-[1])" ,0,50);//p-Pb pi0 AllCent
+     
+     HagFunctionPi0->SetParameters(8.15719, 7.19545, 0.168252, 134.9766/1000.);
+     
+     TF1 *HagFunctionEta = new TF1("eta", "[0]/2*TMath::Pi() * (([1]-1)*([1]-2))/([1]*[2]*([1]*[2]+[3]*([1]-2))) * pow ((1 + (TMath::Sqrt(x*x + [3]*[3])- [3])/([1]*[2])),-[1])" ,0,50);
+     
+     HagFunctionEta->SetParameters(0.909368, 7.50074, 0.269817, 547.862/1000.);
+     */
+    
+    
+    TH1F *temp = (TH1F*) fInputList->FindObject("fPtMCpi0_NoMother");
+    TH1F* PionEnh = (TH1F*) temp->Rebin(Nbins,"PionEnh",bins);
+    PionEnh->SetTitle("#pi^{0} from enhanced (with no mother);p_{T} (GeV/c);Counts/bin size ");
+    temp = (TH1F*) fInputList->FindObject("fPtMCEta_NoMother");
+    TH1F *EtaEnh = (TH1F*) temp->Rebin(Nbins,"EtaEnh",bins);
+    EtaEnh->SetTitle("#eta from enhanced (with no mother);p_{T} (GeV/c);Counts/bin size ");
+    
+    temp = (TH1F*) fInputList->FindObject("fPtMCpi0_PureHijing");
+    TH1F* PionHijing = (TH1F*) temp->Rebin(Nbins,"PionHijing",bins);
+    PionHijing->SetTitle("#pi from non-enhanced;p_{T} (GeV/c);Counts/bin size ");
+    
+    temp = (TH1F*) fInputList->FindObject("fPtMCEta_PureHijing");
+    TH1F *EtaHijing = (TH1F*) temp->Rebin(Nbins,"EtaHijing",bins);
+    EtaHijing->SetTitle("#eta from non-enhanced;p_{T} (GeV/c);Counts/bin size ");
+    
+    
+    //PionHijing->Add(PionEnh);
+    //EtaHijing->Add(EtaEnh);
+    
+    PionHijing->Scale(1./Nevents);
+    EtaHijing->Scale(1./Nevents);
+    
+    PionHijing->Scale(1.,"width");
+    EtaHijing->Scale(1.,"width");
+    
+    PionHijing->Scale(1./(2*TMath::Pi()));
+    EtaHijing->Scale(1./(2*TMath::Pi()));
+    
+    PionHijing->Scale(1./2.4);
+    EtaHijing->Scale(1./2.4);
+    
+    for (Int_t i = 1; i <= PionHijing->GetNbinsX(); i++)
+    {
+        PionHijing->SetBinContent(i,PionHijing->GetBinContent(i)/PionHijing->GetBinCenter(i));
+        PionHijing->SetBinError(i,PionHijing->GetBinError(i)/PionHijing->GetBinCenter(i));
+        
+        EtaHijing->SetBinContent(i,EtaHijing->GetBinContent(i)/EtaHijing->GetBinCenter(i));
+        EtaHijing->SetBinError(i,EtaHijing->GetBinError(i)/EtaHijing->GetBinCenter(i));
+        
+    }
+    
+    
+    PionHijing->SaveAs("Pionspectra.root");
+    EtaHijing->SaveAs("EtaSpectra.root");
+    
+    //Divide by data!
+    
+    for (Int_t i = 1; i <= PionHijing->GetNbinsX(); i++)
+    {
+        //PionHijing->SetBinContent(i,(0.5*ybinsDATA[i-1])/PionHijing->GetBinContent(i));
+        PionHijing->SetBinError(i,0);
+        
+        //EtaHijing->SetBinContent(i,EtaHijing->GetBinContent(i)/EtaHijing->GetBinCenter(i));
+        //EtaHijing->SetBinError(i,0);
+        
+    }
+    
+    
+    TCanvas *Weight = new TCanvas("Fit", "Fit", 400,300);
+    Weight->SetLogy();
+    //PionHijing->Divide(HagFunctionPi0);
+    PionHijing->SetTitle("#pi ;p_{T} GeV/c;MC/Data");
+    //PionHijing->GetXaxis()->SetRangeUser(0,20);
+    
+    
+    //EtaHijing->Divide(HagFunctionEta);
+    EtaHijing->SetTitle("#eta;p_{T} GeV/c;MC/Data");
+    EtaHijing->GetXaxis()->SetRangeUser(0,20);
+    //EtaHijing->SetLineColor(kRed);
+    EtaHijing->SetMarkerColor(kRed);
+    
+    PionHijing->GetSumw2()->Set(0);
+    EtaHijing->GetSumw2()->Set(0);
+    
+    
+    /*
+     for (Int_t i = 1; i <= PionHijing->GetNbinsX(); i++)
+     {
+     PionHijing->SetBinContent(i, 1./PionHijing->GetBinContent(i));
+     EtaHijing->SetBinContent(i,1./EtaHijing->GetBinContent(i));
+     
+     }
+     */
+    
+    PionHijing->Draw();
+    //EtaHijing->Draw("same");
+    
+    Weight->BuildLegend();
+    
+    TFile *ExportInverseW = new TFile("BackgroundWtoData_Inverse.root", "RECREATE");
+    PionHijing->Write("Pi0");
+    EtaHijing->Write("Eta");
+    ExportInverseW->Clone();
+    
+    
+    
+}
+
+void AliHFehpPbTool::CalculateWToDataPionFromAndreaNoEnh()
+{
+    Double_t bins[83] = { 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 3.0, 3.1, 3.2, 3.3,3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 4.0, 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8, 4.9, 5, 5.2, 5.4, 5.6, 5.8, 6.0, 6.2, 6.4, 6.6, 6.8, 7.0, 7.2, 7.4, 7.6, 7.8, 8.0, 8.5, 9.0, 9.5, 10.0, 11, 12, 13, 14, 15, 16,18,20,100};
+    Int_t Nbins = 82-4-1;
+    
+    //Double_t bins[59] = {0.100,0.120,0.140,0.160,0.180,0.200,0.250,0.300,0.350,0.400,0.450,0.500,0.550,0.600,0.650,0.700,0.750,0.800,0.850,0.900,0.950,1.000,1.100,1.200,1.300,1.400,1.500,1.600,1.700,1.800,1.900,2.000,2.200,2.400,2.600,2.800,3.000,3.200,3.400,3.600,3.800,4.000,4.500,5.000,5.500,6.000,6.500,7.000,8.000,9.000,10.000,11.000,12.000,13.000,14.000,15.000,16.000,18.000,20.00};
+    // Int_t Nbins = 58;
+    
+    //Double_t bins[45] =  {0.1,0.112797,0.127231,0.143512,0.161877,0.182592,0.205957,0.232313,0.262041,0.295573,0.333397,0.37606,0.424183,0.478465,0.539692,0.608754,0.686654,0.774523,0.873636,0.985432,1.11153,1.25377,1.41421,1.59519,1.79932,2.02957,2.28928,2.58223,2.91267,3.2854,3.70582,4.18004,4.71494,5.3183,5.99886,6.76651,7.6324,8.60909,9.71076,10.9534,12.3551,13.9361,15.7195,17.731,20};
+    
+    //Int_t Nbins = 44;
+    
+    Double_t Nevents = GetNEvents();
+    
+    TF1 *HagFunctionPi0 = new TF1("levy","1.245*((7.331-1.)*(7.331-2.))/(7.331*0.1718*(7.331*0.1718+0.135*(7.331-2.)))*pow(1.+(sqrt(0.135*0.135+x*x)-0.135)/(7.331*0.1718),-7.331)",0,100);//p-Pb pi0 AllCent
+    
+    TF1 *HagFunctionEta =new TF1("levy1","0.48*((((7.331-1.)*(7.331-2.))/(7.331*0.1718*(7.331*0.1718+0.13498*(7.331-2.)))*pow(1.+(sqrt(0.13498*0.13498+25)-0.13498)/(7.331*0.1718),-7.331)) / (((7.331-1.)*(7.331-2.))/(7.331*0.1718*(7.331*0.1718+0.13498*(7.331-2.)))*pow(1.+(sqrt(0.54751*0.54751+25)-0.13498)/(7.331*0.1718),-7.331)))*(x/sqrt(x*x + 0.54751*0.54751 - 0.13498*0.13498))*1.245*((7.331-1.)*(7.331-2.))/(7.331*0.1718*(7.331*0.1718+0.13498*(7.331-2.)))*pow(1.+(sqrt(0.54751*0.54751+x*x)-0.13498)/(7.331*0.1718),-7.331)",0,100);
+    
+    
+    TH1F *EtaHijing = (TH1F*) fInputList->FindObject("fPtMCEta_kNoMother");
+    
+    TH1F* temp = (TH1F*) fInputList->FindObject("fPtMCEta_kNoFeedDown");
+    EtaHijing->Add(temp);
+    
+    
+    temp = (TH1F*) fInputList->FindObject("fPtMCEta_kBeauty");
+    EtaHijing->Add(temp);
+    
+    temp = (TH1F*) fInputList->FindObject("fPtMCEta_kCharm");
+    EtaHijing->Add(temp);
+    
+    
+    TH1F *PionHijing = (TH1F*) fInputList->FindObject("fPtMCpi0_kNoMother");
+    
+    temp = (TH1F*) fInputList->FindObject("fPtMCpi0_kNoFeedDown");
+    PionHijing->Add(temp);
+    
+    
+    temp = (TH1F*) fInputList->FindObject("fPtMCpi0_kBeauty");
+    PionHijing->Add(temp);
+    
+    temp = (TH1F*) fInputList->FindObject("fPtMCpi0_kCharm");
+    PionHijing->Add(temp);
+    
+    
+    PionHijing =  (TH1F*) PionHijing->Rebin(Nbins,"PionHijing",bins);
+    EtaHijing =  (TH1F*) EtaHijing->Rebin(Nbins,"PionHijing",bins);
+    
+    PionHijing->SetTitle("#pi from non-enhanced;p_{T} (GeV/c);Counts/bin size ");
+    EtaHijing->SetTitle("#eta from non-enhanced;p_{T} (GeV/c);Counts/bin size ");
+    
+    PionHijing->Scale(1./Nevents);
+    EtaHijing->Scale(1./Nevents);
+    
+    PionHijing->Scale(1.,"width");
+    EtaHijing->Scale(1.,"width");
+    
+    PionHijing->Scale(1./(2*TMath::Pi()));
+    EtaHijing->Scale(1./(2*TMath::Pi()));
+    
+    PionHijing->Scale(1./2.4);
+    EtaHijing->Scale(1./2.4);
+    
+    for (Int_t i = 1; i <= PionHijing->GetNbinsX(); i++)
+    {
+        PionHijing->SetBinContent(i,PionHijing->GetBinContent(i)/PionHijing->GetBinCenter(i));
+        PionHijing->SetBinError(i,PionHijing->GetBinError(i)/PionHijing->GetBinCenter(i));
+        
+        EtaHijing->SetBinContent(i,EtaHijing->GetBinContent(i)/EtaHijing->GetBinCenter(i));
+        EtaHijing->SetBinError(i,EtaHijing->GetBinError(i)/EtaHijing->GetBinCenter(i));
+        
+    }
+    
+    PionHijing->SaveAs("Pionspectra.root");
+    EtaHijing->SaveAs("EtaSpectra.root");
+    
+    TCanvas *Weight = new TCanvas("Fit", "Fit", 400,300);
+    Weight->SetLogy();
+    PionHijing->Divide(HagFunctionPi0);
+    PionHijing->SetTitle("#pi ;p_{T} GeV/c;MC/Data");
+    PionHijing->GetXaxis()->SetRangeUser(0,50);
+    
+    
+    EtaHijing->Divide(HagFunctionEta);
+    EtaHijing->SetTitle("#eta;p_{T} GeV/c;MC/Data");
+    EtaHijing->GetXaxis()->SetRangeUser(0,50);
+    EtaHijing->SetLineColor(kRed);
+    EtaHijing->SetMarkerColor(kRed);
+    
+    PionHijing->GetSumw2()->Set(0);
+    EtaHijing->GetSumw2()->Set(0);
+    
+    
+    
+    
     for (Int_t i = 1; i <= PionHijing->GetNbinsX(); i++)
     {
         PionHijing->SetBinContent(i, 1./PionHijing->GetBinContent(i));
@@ -1789,18 +2325,394 @@ void AliHFehpPbTool::CalculateWToDataPrelimiray()
         
     }
     
+    
+    
     PionHijing->Draw();
     EtaHijing->Draw("same");
     
     Weight->BuildLegend();
     
-    TFile *ExportInverseW = new TFile("BackgroundWtoData_Premilinary.root", "RECREATE");
+    TFile *ExportInverseW = new TFile("BackgroundWtoData_Inverse_Fit_NoEnh.root", "RECREATE");
     PionHijing->Write("Pi0");
     EtaHijing->Write("Eta");
     ExportInverseW->Clone();
     
     
+}
 
+void AliHFehpPbTool::CalculateWToDataNoFitPion()
+{
+    Double_t bins[61+4+6] = {0.0,0.02,0.04,0.06,0.08,0.100,0.120,0.140,0.160,0.180,0.200,0.250,0.300,0.350,0.400,0.450,0.500,0.550,0.600,0.650,0.700,0.750,0.800,0.850,0.900,0.950,1.000,1.100,1.200,1.300,1.400,1.500,1.600,1.700,1.800,1.900,2.000,2.200,2.400,2.600,2.800,3.000,3.200,3.400,3.600,3.800,4.000,4.500,5.000,5.500,6.000,6.500,7.000,8.000,9.000,10.000,11.000,12.000,13.000,14.000,15.000,16.000,18.000,20.00,25,30,35,40,45,50,100};
+    
+    Int_t Nbins = 58+1+1+4+6;
+    
+    Double_t Nevents = GetNEvents();
+    
+    TH1F *EtaHijing = (TH1F*) fInputList->FindObject("fPtMCEta_kNoMother");
+    
+    TH1F* temp = (TH1F*) fInputList->FindObject("fPtMCEta_kLightMesons");
+    EtaHijing->Add(temp);
+    
+    temp = (TH1F*) fInputList->FindObject("fPtMCEta_kNoFeedDown");
+    EtaHijing->Add(temp);
+    
+    temp = (TH1F*) fInputList->FindObject("fPtMCEta_kBeauty");
+    EtaHijing->Add(temp);
+    
+    temp = (TH1F*) fInputList->FindObject("fPtMCEta_kCharm");
+    EtaHijing->Add(temp);
+    
+    
+    TH1F *PionHijing = (TH1F*) fInputList->FindObject("fPtMCpi0_kNoMother");
+
+    temp = (TH1F*) fInputList->FindObject("fPtMCpi0_kNoFeedDown");
+    PionHijing->Add(temp);
+    
+    //temp = (TH1F*) fInputList->FindObject("fPtMCpi0_kNoIsPrimary");
+    //PionHijing->Add(temp);
+    
+    temp = (TH1F*) fInputList->FindObject("fPtMCpi0_kLightMesons");
+    PionHijing->Add(temp);
+    
+    temp = (TH1F*) fInputList->FindObject("fPtMCpi0_kBeauty");
+    PionHijing->Add(temp);
+    
+    temp = (TH1F*) fInputList->FindObject("fPtMCpi0_kCharm");
+    PionHijing->Add(temp);
+    
+    
+    PionHijing =  (TH1F*) PionHijing->Rebin(Nbins,"PionHijing",bins);
+    EtaHijing =  (TH1F*) EtaHijing->Rebin(Nbins,"EtaHijing",bins);
+    
+    PionHijing->SetTitle("#pi from non-enhanced;p_{T} (GeV/c);Counts/bin size ");
+    EtaHijing->SetTitle("#eta from non-enhanced;p_{T} (GeV/c);Counts/bin size ");
+    
+    PionHijing->Scale(1./Nevents);
+    EtaHijing->Scale(1./Nevents);
+    
+    PionHijing->Scale(1.,"width");
+    EtaHijing->Scale(1.,"width");
+    
+    PionHijing->Scale(1./(2*TMath::Pi()));
+    EtaHijing->Scale(1./(2*TMath::Pi()));
+    
+    PionHijing->Scale(1./1.6);
+    EtaHijing->Scale(1./1.6);
+    
+    
+    for (Int_t i = 1; i <= PionHijing->GetNbinsX(); i++)
+    {
+        PionHijing->SetBinContent(i,PionHijing->GetBinContent(i)/PionHijing->GetBinCenter(i));
+        PionHijing->SetBinError(i,0);
+        
+        EtaHijing->SetBinContent(i,EtaHijing->GetBinContent(i)/EtaHijing->GetBinCenter(i));
+        EtaHijing->SetBinError(i,0);
+        
+    }
+    
+    TF1 *PionFitFunction = new TF1("#pi^{#pm}", "[0]*(([1]-1)*([1]-2))/([1]*[2]*([1]*[2]+[3]*([1]-2)))*pow((1 + (TMath::Sqrt([4]*[4]+x*x)-[3])/([1]*[2])),-[1])",0,100);
+    //C, n, T, m(pion), m(meson)
+    PionFitFunction->SetParameters(0.5*2.70114,6.79896,1.50142e-01,139.57018/1000.,139.57018/1000.);
+    
+    TF1 *EtaFitFunction = new TF1("#eta", "[0]*(([1]-1)*([1]-2))/([1]*[2]*([1]*[2]+[3]*([1]-2)))*pow((1 + (TMath::Sqrt([4]*[4]+x*x)-[3])/([1]*[2])),-[1])",0,100);
+    //C, n, T, m(pion), m(meson)
+    EtaFitFunction->SetParameters(0.48*0.5*2.70114,6.79896,1.50142e-01,139.57018/1000.,547.862/1000.);
+    
+    PionHijing->SaveAs("Pionspectra.root");
+    EtaHijing->SaveAs("EtaSpectra.root");
+    PionHijing->Divide(PionFitFunction);
+    EtaHijing->Divide(EtaFitFunction);
+    
+    
+    TCanvas *Weight = new TCanvas("Fit", "Fit", 400,300);
+    Weight->SetLogy();
+    PionHijing->SetTitle("#pi ;p_{T} GeV/c;MC/Data");
+    
+    
+    EtaHijing->SetTitle("#eta;p_{T} GeV/c;MC/Data");
+    EtaHijing->GetXaxis()->SetRangeUser(0,20);
+    EtaHijing->SetMarkerColor(kRed);
+    
+    PionHijing->GetSumw2()->Set(0);
+    EtaHijing->GetSumw2()->Set(0);
+    
+    
+    /*
+     for (Int_t i = 1; i <= PionHijing->GetNbinsX(); i++)
+     {
+     PionHijing->SetBinContent(i, 1./PionHijing->GetBinContent(i));
+     EtaHijing->SetBinContent(i,1./EtaHijing->GetBinContent(i));
+     
+     }
+     */
+    
+    /*
+    
+     TFile *ResultsMinjung = new TFile("$ALICE_PHYSICS/PWGHF/hfe/macros/nonHFEcorrect.root");
+     TH1F* WeightsRun1 = (TH1F*) ResultsMinjung->Get("hRatio_pPb_5.023TeV_HIJING_pion");
+     WeightsRun1->Draw();
+     
+     TH1F* WeightsRun12 = (TH1F*) ResultsMinjung->Get("hRatio_pPb_5.023TeV_HIJING_eta");
+     WeightsRun12->Draw("same");
+    */
+    
+    
+    PionHijing->SetLineColor(kGreen);
+    EtaHijing->SetLineColor(kMagenta);
+    PionHijing->Draw("same");
+    EtaHijing->Draw("same");
+    
+    Weight->BuildLegend();
+    
+    TFile *ExportInverseW = new TFile("BackgroundW_Primary.root", "RECREATE");
+    PionHijing->Write("Pi0");
+    EtaHijing->Write("Eta");
+    ExportInverseW->Clone();
+    
+    
+    
+}
+
+void AliHFehpPbTool::CalculateWToDataNoFitPionEnh()
+{
+    Double_t bins[61+4+4] = {0.0,0.02,0.04,0.06,0.08,0.100,0.120,0.140,0.160,0.180,0.200,0.250,0.300,0.350,0.400,0.450,0.500,0.550,0.600,0.650,0.700,0.750,0.800,0.850,0.900,0.950,1.000,1.100,1.200,1.300,1.400,1.500,1.600,1.700,1.800,1.900,2.000,2.200,2.400,2.600,2.800,3.000,3.200,3.400,3.600,3.800,4.000,4.500,5.000,5.500,6.000,6.500,7.000,8.000,9.000,10.000,11.000,12.000,13.000,14.000,15.000,16.000,18.000,20.00,25,30,35,40,50};
+    
+    Double_t ybinsDATA[58] = {39.55, 34.89, 30.87, 27.06,23.6, 18.92, 13.96, 10.47, 7.994, 6.194, 4.852, 3.837, 3.081, 2.513, 2.053, 1.701, 1.406, 1.172, 0.9803, 0.8255, 0.6971, 0.5445, 0.3991, 0.2944, 0.2208, 0.1662, 0.1271, 0.09805, 0.07637, 0.05982, 0.04697, 0.03344, 0.02158, 0.01417, 0.009503, 0.006552, 0.004579, 0.003216, 0.002324, 0.001701, 0.00124, 0.000756, 0.0003868, 0.0002116, 0.0001213, 7.17E-05, 4.44E-05, 2.36E-05, 1.10E-05, 5.45E-06, 2.91E-06, 1.64E-06, 9.96E-07, 6.40E-07, 3.99E-07, 2.63E-07, 1.51E-07, 7.32E-08};
+    
+    Int_t Nbins = 58+1+1+4+4;
+    
+    Double_t Nevents = GetNEvents();
+    
+    //[0]  = A, [1] = nTsallis, [2] = T, [3] = mass
+    
+    /*
+     TF1 *HagFunctionPi0 = new TF1("pi0", "[0]/2*TMath::Pi() * (([1]-1)*([1]-2))/([1]*[2]*([1]*[2]+[3]*([1]-2))) * pow ((1 + (TMath::Sqrt(x*x + [3]*[3])- [3])/([1]*[2])),-[1])" ,0,50);//p-Pb pi0 AllCent
+     
+     HagFunctionPi0->SetParameters(8.15719, 7.19545, 0.168252, 134.9766/1000.);
+     
+     TF1 *HagFunctionEta = new TF1("eta", "[0]/2*TMath::Pi() * (([1]-1)*([1]-2))/([1]*[2]*([1]*[2]+[3]*([1]-2))) * pow ((1 + (TMath::Sqrt(x*x + [3]*[3])- [3])/([1]*[2])),-[1])" ,0,50);
+     
+     HagFunctionEta->SetParameters(0.909368, 7.50074, 0.269817, 547.862/1000.);
+     */
+    
+    
+    TH1F *EtaHijing = (TH1F*) fInputList->FindObject("fPtMCEta_kNoMother_Enh");
+    
+    
+    TH1F *PionHijing = (TH1F*) fInputList->FindObject("fPtMCpi0_kNoMother_Enh");
+    
+    //TF1 correc("correc","TMath::Sqrt(0.14*0.14 + x)
+    
+    
+    
+    PionHijing =  (TH1F*) PionHijing->Rebin(Nbins,"PionHijing",bins);
+    EtaHijing =  (TH1F*) EtaHijing->Rebin(Nbins,"EtaHijing",bins);
+    
+    PionHijing->SetTitle("#pi from non-enhanced;p_{T} (GeV/c);Counts/bin size ");
+    EtaHijing->SetTitle("#eta from non-enhanced;p_{T} (GeV/c);Counts/bin size ");
+    
+    PionHijing->Scale(1./Nevents);
+    EtaHijing->Scale(1./Nevents);
+    
+    PionHijing->Scale(1.,"width");
+    EtaHijing->Scale(1.,"width");
+    
+    PionHijing->Scale(1./(2*TMath::Pi()));
+    EtaHijing->Scale(1./(2*TMath::Pi()));
+    
+    PionHijing->Scale(1./1.6);
+    EtaHijing->Scale(1./1.6);
+    
+    
+    for (Int_t i = 1; i <= PionHijing->GetNbinsX(); i++)
+    {
+        PionHijing->SetBinContent(i,PionHijing->GetBinContent(i)/PionHijing->GetBinCenter(i));
+        PionHijing->SetBinError(i,0);
+        
+        EtaHijing->SetBinContent(i,EtaHijing->GetBinContent(i)/EtaHijing->GetBinCenter(i));
+        EtaHijing->SetBinError(i,EtaHijing->GetBinError(i)/EtaHijing->GetBinCenter(i));
+        
+    }
+    
+    TF1 *PionFitFunction = new TF1("#pi^{#pm}", "[0]*(([1]-1)*([1]-2))/([1]*[2]*([1]*[2]+[3]*([1]-2)))*pow((1 + (TMath::Sqrt([4]*[4]+x*x)-[3])/([1]*[2])),-[1])",0,100);
+    //C, n, T, m(pion), m(meson)
+    PionFitFunction->SetParameters(0.5*2.70114,6.79896,1.50142e-01,139.57018/1000.,139.57018/1000.);
+    
+    TF1 *EtaFitFunction = new TF1("#eta", "[0]*(([1]-1)*([1]-2))/([1]*[2]*([1]*[2]+[3]*([1]-2)))*pow((1 + (TMath::Sqrt([4]*[4]+x*x)-[3])/([1]*[2])),-[1])",0,100);
+    //C, n, T, m(pion), m(meson)
+    EtaFitFunction->SetParameters(0.48*0.5*2.70114,6.79896,1.50142e-01,139.57018/1000.,547.862/1000.);
+    
+    // TF1 *EtaFitFunction =new TF1("levy1","((((7.331-1.)*(7.331-2.))/(7.331*0.1718*(7.331*0.1718+0.13498*(7.331-2.)))*pow(1.+(sqrt(0.13498*0.13498+25)-0.13498)/(7.331*0.1718),-7.331)) / (((7.331-1.)*(7.331-2.))/(7.331*0.1718*(7.331*0.1718+0.13498*(7.331-2.)))*pow(1.+(sqrt(0.54751*0.54751+25)-0.13498)/(7.331*0.1718),-7.331)))*(x/sqrt(x*x + 0.54751*0.54751 - 0.13498*0.13498))*1.245*((7.331-1.)*(7.331-2.))/(7.331*0.1718*(7.331*0.1718+0.13498*(7.331-2.)))*pow(1.+(sqrt(0.54751*0.54751+x*x)-0.13498)/(7.331*0.1718),-7.331)",0,100);
+    
+    PionHijing->SaveAs("Pionspectra.root");
+    EtaHijing->SaveAs("EtaSpectra.root");
+    PionHijing->Divide(PionFitFunction);
+    EtaHijing->Divide(EtaFitFunction);
+    
+    //Divide by data!
+    
+    for (Int_t i = 1; i <= PionHijing->GetNbinsX(); i++)
+    {
+        //PionHijing->SetBinContent(i,(0.5*ybinsDATA[i-1])/PionHijing->GetBinContent(i));
+        PionHijing->SetBinError(i,0);
+        
+        //EtaHijing->SetBinContent(i,EtaHijing->GetBinContent(i)/EtaHijing->GetBinCenter(i));
+        //EtaHijing->SetBinError(i,0);
+        
+    }
+    
+    
+    
+    TCanvas *Weight = new TCanvas("Fit", "Fit", 400,300);
+    Weight->SetLogy();
+    //PionHijing->Divide(HagFunctionPi0);
+    PionHijing->SetTitle("#pi ;p_{T} GeV/c;MC/Data");
+    //PionHijing->GetXaxis()->SetRangeUser(0,20);
+    
+    
+    //EtaHijing->Divide(HagFunctionEta);
+    EtaHijing->SetTitle("#eta;p_{T} GeV/c;MC/Data");
+    EtaHijing->GetXaxis()->SetRangeUser(0,20);
+    //EtaHijing->SetLineColor(kRed);
+    EtaHijing->SetMarkerColor(kRed);
+    
+    PionHijing->GetSumw2()->Set(0);
+    EtaHijing->GetSumw2()->Set(0);
+    
+    
+    
+    for (Int_t i = 1; i <= PionHijing->GetNbinsX(); i++)
+    {
+        PionHijing->SetBinContent(i, 1./PionHijing->GetBinContent(i));
+        EtaHijing->SetBinContent(i,1./EtaHijing->GetBinContent(i));
+        
+    }
+    
+    /*
+     
+     //PionHijing->Scale(1.44);
+     TFile *ResultsMinjung = new TFile("$ALICE_PHYSICS/PWGHF/hfe/macros/nonHFEcorrect.root");
+     TH1F* WeightsRun1 = (TH1F*) ResultsMinjung->Get("hRatio_pPb_5.023TeV_HIJING_pion");
+     WeightsRun1->Draw();
+     
+     TH1F* WeightsRun12 = (TH1F*) ResultsMinjung->Get("hRatio_pPb_5.023TeV_HIJING_eta");
+     WeightsRun12->Draw("same");
+     */
+    //PionHijing->Scale(1.44);
+    //EtaHijing->Scale(1.44);
+    
+    PionHijing->SetLineColor(kGreen);
+    EtaHijing->SetLineColor(kMagenta);
+    PionHijing->Draw("same");
+    EtaHijing->Draw("same");
+    
+    Weight->BuildLegend();
+    
+    TFile *ExportInverseW = new TFile("BackgroundWtoData_Inverse_Enhanced.root", "RECREATE");
+    PionHijing->Write("Pi0W");
+    EtaHijing->Write("Eta");
+    ExportInverseW->Clone();
+    
+    
+    
+}
+
+
+void AliHFehpPbTool::LocalMerge(TString ExportName)
+{
+    TFile *MergedFile = new TFile(ExportName.Data(),"RECREATE");
+    MergedFile->cd();
+    
+    TString DirectoryName = "HFE_h_";
+    DirectoryName.Append(fConfigurationName.Data());
+    
+    TString ListName = "eh_";
+    ListName.Append(fConfigurationName.Data());
+    
+    TDirectoryFile *dir = new TDirectoryFile(DirectoryName.Data(),DirectoryName.Data());
+    dir->cd();
+    
+    TList *List = new TList();
+    List->SetOwner();
+    
+    TString NamesToCopy[3] = {"fPtElec_Inc","fPtElec_ULS","fPtElec_LS"};
+    
+    //Copy only
+    for (Int_t i = 0; i < 3; i++) {
+        TH1F *temp = (TH1F*) fInputList->FindObject(NamesToCopy[i].Data());
+        List->Add(temp);
+    }
+    
+    
+    TString NamesToMerge[10] = {"fCEtaPhi_Inc", "fCEtaPhi_Inc_EM","fCEtaPhi_Inc_DiHadron", "fCEtaPhi_ULS_Weight", "fCEtaPhi_LS_Weight", "fCEtaPhi_ULS_NoP_Weight", "fCEtaPhi_LS_NoP_Weight", "fCEtaPhi_ULS_Weight_EM", "fCEtaPhi_LS_Weight_EM", "fTOFTPCnsigma_pt"};
+    
+    Double_t OriginalBins[] = {0.5,0.75,1.0,1.25,1.5,2.0,3.0,4.0,6.0};
+    Double_t MergeBins[] = {0.5,1.0,2.0,4.0,6.0};
+    
+    
+    for (Int_t i = 0 ; i < 10; i++ )
+    {
+        //1st bin
+        TString NameFirstBin = NamesToMerge[i] + Form("%d",0);
+        TH1F *FirstBin = (TH1F*) fInputList->FindObject(NameFirstBin.Data());
+        
+        for (Int_t j = 1 ; j < 2; j++)
+        {
+            TString Name = NamesToMerge[i] + Form("%d",j);
+            TH1F *temp = (TH1F*) fInputList->FindObject(Name.Data());
+            FirstBin->Add(temp);
+        }
+        
+        FirstBin->SetTitle("0.50 < p_{T}^{e} < 1.00");
+        List->Add(FirstBin);
+        
+        
+        //2nd bin
+        TString NameBin2 = NamesToMerge[i] + Form("%d",2);
+        TH1F *Bin2 = (TH1F*) fInputList->FindObject(NameBin2.Data());
+        
+        for (Int_t j = 3 ; j < 5; j++)
+        {
+            TString Name = NamesToMerge[i] + Form("%d",j);
+            TH1F *temp = (TH1F*) fInputList->FindObject(Name.Data());
+            Bin2->Add(temp);
+        }
+        
+        Bin2->SetTitle("1.00 < p_{T}^{e} < 2.00");
+        Bin2->SetName(Form("%s1",NamesToMerge[i].Data()));
+        List->Add(Bin2);
+        
+        //3rd bin
+        TString NameBin3 = NamesToMerge[i] + Form("%d",5);
+        TH1F *Bin3 = (TH1F*) fInputList->FindObject(NameBin3.Data());
+        
+        for (Int_t j = 6 ; j < 8; j++)
+        {
+            TString Name = NamesToMerge[i] + Form("%d",j);
+            TH1F *temp = (TH1F*) fInputList->FindObject(Name.Data());
+            Bin3->Add(temp);
+        }
+        Bin3->SetName(Form("%s2",NamesToMerge[i].Data()));
+        
+        Bin3->SetTitle("2.00 < p_{T}^{e} < 4.00");
+        List->Add(Bin3);
+        
+        
+        //3rd bin
+        TString NameBin4 = NamesToMerge[i] + Form("%d",8);
+        TH1F *Bin4 = (TH1F*) fInputList->FindObject(NameBin4.Data());
+        Bin4->SetName(Form("%s3",NamesToMerge[i].Data()));
+        
+        List->Add(Bin4);
+        
+        
+    }
+    
+    List->Write(ListName.Data(),TObject::kSingleKey);
+    
+    MergedFile->Close();
+    
+    
 }
 
 
