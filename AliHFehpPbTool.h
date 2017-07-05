@@ -11,6 +11,8 @@
 
 class TH2F;
 class TFile;
+class TF1;
+
 
 class AliHFehpPbTool : public TNamed {
     
@@ -27,8 +29,16 @@ public:
     void SetpTBins(Int_t n, Double_t* array) { fpTBins.Set(n,array); };
     void SetpTBinsResults(Int_t n, Double_t* array) { fpTBinsResults.Set(n,array); };
     void SetLegendTitle(TString Legend) {fLegendTitle = Legend;};
+    void SetDeltaEtaLimits(Double_t Min, Double_t Max) {fMaxDeltaEta = Max; fMinDeltaEta = Min;};
     void SetEfficiencyTaggingToConstant(Double_t Value);
+    void DrawTemplateJetFit(TH1F* Correlation);
     
+    void ProcessNHFe();
+    void MakeNonHFEPlots();
+    
+    void ProcessInc();
+    void MakeIncPlots();
+
     void LocalMerge(TString ExportName);
     
 
@@ -54,6 +64,7 @@ public:
     Bool_t NormalizeHFeCorrrelation();
     Bool_t ProjectMCTo1D();
     Bool_t ProjectTo1D();
+    void ProjectTo1DAtlas();
     Bool_t CorrelationCT1D();
     Bool_t ReadTaggingEfficiencyFromFile();
     Bool_t CalculateTaggingEfficiencyW();
@@ -69,7 +80,12 @@ public:
     void CalculateWToDataNoEnh();
     void CalculateWToDataUseEnh();
     
+    TF1* DoTemplateJetFit(TH1F* Correlation);
+    void DrawTemplatev2Fit(TH1F* Correlation);
+
+    
     void Process();
+    void ProcessAtlas();
     void CalculateFlow1D(AliHFehpPbTool* Reference,Bool_t FitConstant  = kFALSE);
     void FormatTH2Titles(TH2F* histo);
     
@@ -152,6 +168,13 @@ public:
     TH2F* GetMC2DCT(Int_t pT){return fRatio2DMCCT[pT];};
     Bool_t CalculateTaggingEfficiencyWToDataNoEnh();
     Double_t GetNEvents();
+    TH1F* GetIncpT() {return fInclusivepT;};
+    TH1F* GetBkgpT() {return fBackgroundpT;};
+    
+    TF1* DoTemplatev2Fit(TH1F* Correlation, TF1* JetFit);
+    
+    void SystematicFromv2Fit(TH1F* Correlation,TF1* JetFit);
+    
     
     void SetUseEffElectrons(Bool_t Use = kTRUE){fEffCorrectionForElectrons = Use;};
     void PreMerge();
@@ -174,6 +197,9 @@ private:
     
     Int_t fConfigIndex;
     Int_t fCentralityIndex;
+    Double_t fMaxDeltaEta;
+    Double_t fMinDeltaEta;
+
     TString fLegendTitle;
     
     TFile *fInputFile; //!
@@ -219,6 +245,8 @@ private:
     //HFe
     TH2F **fHFEh;
     TH2F **fHFEhNormalized;
+    TH2F **fHFEhSameNormalized;
+    TH2F **fHFEhMixedNormalized;
     TH1F **fHFEhNormSub1D;
     TH1F **fFlowHistograms;
     TH1F **fHFehProjectionForV2NonSub;
